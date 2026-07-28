@@ -29,18 +29,18 @@ jobs:
           node-version: '20'
 
       - name: Install NPM Dependencies
-        run: npm install
+        run: npm ci || npm install
 
-      - name: Add Capacitor Android Platform
-        run: |
-          npx cap add android || true
-          npx cap sync android
+      - name: Sync Capacitor Web Assets
+        run: npx cap sync android
 
-      - name: Build Android APK with Gradle & Capacitor
+      - name: Make Gradle Executable
+        run: chmod +x android/gradlew
+
+      - name: Build Android Release APK with Gradle
         run: |
           cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease --no-daemon
 
       - name: Generate Keystore & Sign APK with apksigner
         run: |
@@ -70,7 +70,7 @@ jobs:
           $BUILD_TOOLS/apksigner verify SmartStock.apk
           echo "Successfully created signed SmartStock.apk!"
 
-      - name: Delete Existing Tag/Release (if any)
+      - name: Delete Existing Release (if any)
         run: |
           gh release delete v1.0.0 --yes || true
           git tag -d v1.0.0 || true
