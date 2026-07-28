@@ -1,4 +1,4 @@
-name: Build & Release Signed Android APK
+name: Build & Release Signed Capacitor Android APK
 
 on:
   push:
@@ -28,85 +28,49 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Bubblewrap CLI
-        run: npm install -g @bubblewrap/cli
+      - name: Install NPM Dependencies
+        run: npm install
 
-      - name: Configure Bubblewrap & Android SDK
+      - name: Add Capacitor Android Platform
         run: |
-          mkdir -p ~/.bubblewrap
-          cat << EOF > ~/.bubblewrap/config.json
-          {
-            "jdkPath": "${JAVA_HOME}",
-            "androidSdkPath": "${ANDROID_HOME}"
-          }
-          EOF
+          npx cap add android || true
+          npx cap sync android
 
-      - name: Initialize & Build TWA Project
+      - name: Build Android APK with Gradle & Capacitor
         run: |
-          mkdir twa-build
-          cd twa-build
-          
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: Generate Keystore & Sign APK with apksigner
+        run: |
           # Generate signing keystore
           keytool -genkey -v -keystore android.keystore \
             -alias smartstock -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass smartstock123 -keypass smartstock123 \
             -dname "CN=SmartStock, OU=Development, O=SmartStock, L=City, S=State, C=US"
-            
-          # Create Bubblewrap TWA configuration
-          cat << 'EOF' > twa-manifest.json
-          {
-            "packageId": "com.smartstock.app",
-            "host": "smart-stock-seven.vercel.app",
-            "name": "SmartStock Inventory Core",
-            "launcherName": "SmartStock",
-            "display": "standalone",
-            "themeColor": "#D4AF37",
-            "navigationColor": "#0A0A0F",
-            "backgroundColor": "#0A0A0F",
-            "enableNotifications": true,
-            "startUrl": "/",
-            "iconUrl": "https://smart-stock-seven.vercel.app/icons/icon-512.png",
-            "maskableIconUrl": "https://smart-stock-seven.vercel.app/icons/icon-512.png",
-            "appVersionName": "1.0.0",
-            "appVersionCode": 1,
-            "signingKey": {
-              "path": "./android.keystore",
-              "alias": "smartstock"
-            },
-            "generatorApp": "bubblewrap-cli",
-            "webManifestUrl": "https://smart-stock-seven.vercel.app/manifest.json",
-            "fallbackType": "customtabs",
-            "features": {},
-            "alphaDependencies": {
-              "enabled": false
-            }
-          }
-          EOF
 
-          # Build TWA APK with Bubblewrap
-          bubblewrap build --keyStorePassword=smartstock123 --keyPassword=smartstock123 || true
+          # Locate generated release APK
+          RAW_APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          echo "Found compiled release APK at: $RAW_APK"
 
-          # Find the built APK
-          RAW_APK=$(find . -name "*.apk" | head -n 1)
-          echo "Found generated APK at: $RAW_APK"
-
-          # Find latest android build-tools
+          # Find android build-tools
           BUILD_TOOLS=$(find $ANDROID_HOME/build-tools -maxdepth 1 -mindepth 1 | sort -V | tail -n 1)
           echo "Using Android Build Tools at: $BUILD_TOOLS"
 
           # Align & Sign explicitly using apksigner
-          $BUILD_TOOLS/zipalign -v -f 4 "$RAW_APK" ../aligned.apk
+          $BUILD_TOOLS/zipalign -v -f 4 "$RAW_APK" aligned.apk
           $BUILD_TOOLS/apksigner sign --ks android.keystore \
             --ks-key-alias smartstock \
             --ks-pass pass:smartstock123 \
             --key-pass pass:smartstock123 \
-            --out ../SmartStock.apk ../aligned.apk
+            --out SmartStock.apk aligned.apk
 
           # Verify signature
-          $BUILD_TOOLS/apksigner verify ../SmartStock.apk
-          echo "Successfully created and verified signed SmartStock.apk!"
+          $BUILD_TOOLS/apksigner verify SmartStock.apk
+          echo "Successfully created signed SmartStock.apk!"
 
-      - name: Delete Existing Release (if any)
+      - name: Delete Existing Tag/Release (if any)
         run: |
           gh release delete v1.0.0 --yes || true
           git tag -d v1.0.0 || true
@@ -114,15 +78,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create GitHub Release with Signed APK
+      - name: Publish GitHub Release with Signed APK
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.0
-          name: SmartStock v1.0.0 Signed Android APK
+          name: SmartStock v1.0.0 Signed Android APK (Capacitor)
           body: |
-            ## 📱 SmartStock Mobile App (Signed Release APK)
+            ## 📱 SmartStock Mobile App (Capacitor Signed Release APK)
             
-            This is the official **signed Android `.apk` package** for SmartStock Inventory Core.
+            This is the official **signed Android `.apk` package** for SmartStock Inventory Core built using Capacitor.
             
             ### Installation Instructions:
             1. Download **`SmartStock.apk`** below directly to your Android device.

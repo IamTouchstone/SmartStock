@@ -1,6 +1,8 @@
 // SmartStock Mobile Client Application Logic
 
-const API_BASE = ''; 
+const API_BASE = (window.location.origin && !window.location.origin.startsWith('http://localhost') && !window.location.origin.startsWith('http://127.0.0.1') && !window.location.origin.includes('vercel.app'))
+  ? 'https://smart-stock-seven.vercel.app'
+  : ''; 
 let isOfflineMode = false;
 let currentUser = null; // { user_id, name, email, role, org_id }
 let currentOrg = null;  // { id, org_name, admin_email, industry }
