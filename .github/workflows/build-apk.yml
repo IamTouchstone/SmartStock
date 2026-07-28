@@ -31,7 +31,17 @@ jobs:
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
-      - name: Initialize & Build Signed TWA APK
+      - name: Configure Bubblewrap & Android SDK
+        run: |
+          mkdir -p ~/.bubblewrap
+          cat << EOF > ~/.bubblewrap/config.json
+          {
+            "jdkPath": "${JAVA_HOME}",
+            "androidSdkPath": "${ANDROID_HOME}"
+          }
+          EOF
+
+      - name: Initialize & Build TWA Project
         run: |
           mkdir twa-build
           cd twa-build
@@ -73,19 +83,38 @@ jobs:
           }
           EOF
 
-          # Build and sign APK
-          bubblewrap build --keyStorePassword=smartstock123 --keyPassword=smartstock123
+          # Build TWA APK with Bubblewrap
+          bubblewrap build --keyStorePassword=smartstock123 --keyPassword=smartstock123 || true
 
-          # Copy generated signed APK
-          if [ -f "app-release-signed-aligned.apk" ]; then
-            cp app-release-signed-aligned.apk ../SmartStock.apk
-          elif [ -f "app-release-signed.apk" ]; then
-            cp app-release-signed.apk ../SmartStock.apk
-          else
-            find . -name "*signed*.apk" -exec cp {} ../SmartStock.apk \;
-          fi
+          # Find the built APK
+          RAW_APK=$(find . -name "*.apk" | head -n 1)
+          echo "Found generated APK at: $RAW_APK"
 
-      - name: Release Signed APK on GitHub
+          # Find latest android build-tools
+          BUILD_TOOLS=$(find $ANDROID_HOME/build-tools -maxdepth 1 -mindepth 1 | sort -V | tail -n 1)
+          echo "Using Android Build Tools at: $BUILD_TOOLS"
+
+          # Align & Sign explicitly using apksigner
+          $BUILD_TOOLS/zipalign -v -f 4 "$RAW_APK" ../aligned.apk
+          $BUILD_TOOLS/apksigner sign --ks android.keystore \
+            --ks-key-alias smartstock \
+            --ks-pass pass:smartstock123 \
+            --key-pass pass:smartstock123 \
+            --out ../SmartStock.apk ../aligned.apk
+
+          # Verify signature
+          $BUILD_TOOLS/apksigner verify ../SmartStock.apk
+          echo "Successfully created and verified signed SmartStock.apk!"
+
+      - name: Delete Existing Release (if any)
+        run: |
+          gh release delete v1.0.0 --yes || true
+          git tag -d v1.0.0 || true
+          git push origin :refs/tags/v1.0.0 || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release with Signed APK
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.0
