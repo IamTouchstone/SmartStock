@@ -1,7 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = path.join(__dirname, '../data');
+// On Vercel the filesystem is read-only except /tmp
+const DATA_DIR = process.env.VERCEL === '1'
+  ? '/tmp/smartstock_data'
+  : path.join(__dirname, '../data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 const DEFAULT_ORG_ID = "ORG-DEMO-001";

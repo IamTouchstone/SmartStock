@@ -286,7 +286,7 @@ function serveStatic(res, reqPath) {
   });
 }
 
-const server = http.createServer((req, res) => {
+const requestHandler = (req, res) => {
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
   const method = req.method;
@@ -1984,11 +1984,18 @@ const server = http.createServer((req, res) => {
 
   // --- SERVE STATIC ASSETS ---
   serveStatic(res, pathname);
-});
+};
 
-server.listen(PORT, () => {
-  console.log(`====================================================`);
-  console.log(` SmartStock Inventory Core Server running on port ${PORT}`);
-  console.log(` Web UI: http://localhost:${PORT}`);
-  console.log(`====================================================`);
-});
+// Export for Vercel serverless
+module.exports = requestHandler;
+
+// Only start the HTTP server when running locally (not serverless)
+if (process.env.VERCEL !== '1' && require.main === module) {
+  const server = http.createServer(requestHandler);
+  server.listen(PORT, () => {
+    console.log(`====================================================`);
+    console.log(` SmartStock Inventory Core Server running on port ${PORT}`);
+    console.log(` Web UI: http://localhost:${PORT}`);
+    console.log(`====================================================`);
+  });
+}
