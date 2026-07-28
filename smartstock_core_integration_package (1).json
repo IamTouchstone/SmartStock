@@ -1,0 +1,43 @@
+{
+  "project_name": "SmartStock Inventory Core",
+  "version": "1.0.0",
+  "description": "Core Inventory Management & Intelligence suite. Excludes Payments, Escrow, and Pitch modules.",
+  "screens": [
+    "{{DATA:SCREEN:SCREEN_43}}",
+    "{{DATA:SCREEN:SCREEN_38}}",
+    "{{DATA:SCREEN:SCREEN_47}}",
+    "{{DATA:SCREEN:SCREEN_56}}",
+    "{{DATA:SCREEN:SCREEN_45}}",
+    "{{DATA:SCREEN:SCREEN_40}}",
+    "{{DATA:SCREEN:SCREEN_49}}",
+    "{{DATA:SCREEN:SCREEN_37}}",
+    "{{DATA:SCREEN:SCREEN_80}}",
+    "{{DATA:SCREEN:SCREEN_89}}",
+    "{{DATA:SCREEN:SCREEN_22}}",
+    "{{DATA:SCREEN:SCREEN_18}}",
+    "{{DATA:SCREEN:SCREEN_20}}",
+    "{{DATA:SCREEN:SCREEN_76}}",
+    "{{DATA:SCREEN:SCREEN_50}}",
+    "{{DATA:SCREEN:SCREEN_84}}",
+    "{{DATA:SCREEN:SCREEN_32}}",
+    "{{DATA:SCREEN:SCREEN_88}}",
+    "{{DATA:SCREEN:SCREEN_68}}",
+    "{{DATA:SCREEN:SCREEN_30}}",
+    "{{DATA:SCREEN:SCREEN_4}}",
+    "{{DATA:SCREEN:SCREEN_8}}",
+    "{{DATA:SCREEN:SCREEN_28}}",
+    "{{DATA:SCREEN:SCREEN_55}}",
+    "{{DATA:SCREEN:SCREEN_78}}",
+    "{{DATA:SCREEN:SCREEN_86}}",
+    "{{DATA:SCREEN:SCREEN_74}}",
+    "{{DATA:SCREEN:SCREEN_58}}",
+    "{{DATA:SCREEN:SCREEN_81}}",
+    "{{DATA:SCREEN:SCREEN_10}}",
+    "{{DATA:SCREEN:SCREEN_85}}",
+    "{{DATA:SCREEN:SCREEN_91}}",
+    "{{DATA:SCREEN:SCREEN_70}}"
+  ],
+  "design_systems": [
+    "{{DATA:DESIGN_SYSTEM:DESIGN_SYSTEM_2}}"
+  ]
+}
