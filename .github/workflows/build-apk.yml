@@ -1,0 +1,106 @@
+name: Build & Release Signed Android APK
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      - name: Initialize & Build Signed TWA APK
+        run: |
+          mkdir twa-build
+          cd twa-build
+          
+          # Generate signing keystore
+          keytool -genkey -v -keystore android.keystore \
+            -alias smartstock -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass smartstock123 -keypass smartstock123 \
+            -dname "CN=SmartStock, OU=Development, O=SmartStock, L=City, S=State, C=US"
+            
+          # Create Bubblewrap TWA configuration
+          cat << 'EOF' > twa-manifest.json
+          {
+            "packageId": "com.smartstock.app",
+            "host": "smart-stock-seven.vercel.app",
+            "name": "SmartStock Inventory Core",
+            "launcherName": "SmartStock",
+            "display": "standalone",
+            "themeColor": "#D4AF37",
+            "navigationColor": "#0A0A0F",
+            "backgroundColor": "#0A0A0F",
+            "enableNotifications": true,
+            "startUrl": "/",
+            "iconUrl": "https://smart-stock-seven.vercel.app/icons/icon-512.png",
+            "maskableIconUrl": "https://smart-stock-seven.vercel.app/icons/icon-512.png",
+            "appVersionName": "1.0.0",
+            "appVersionCode": 1,
+            "signingKey": {
+              "path": "./android.keystore",
+              "alias": "smartstock"
+            },
+            "generatorApp": "bubblewrap-cli",
+            "webManifestUrl": "https://smart-stock-seven.vercel.app/manifest.json",
+            "fallbackType": "customtabs",
+            "features": {},
+            "alphaDependencies": {
+              "enabled": false
+            }
+          }
+          EOF
+
+          # Build and sign APK
+          bubblewrap build --keyStorePassword=smartstock123 --keyPassword=smartstock123
+
+          # Copy generated signed APK
+          if [ -f "app-release-signed-aligned.apk" ]; then
+            cp app-release-signed-aligned.apk ../SmartStock.apk
+          elif [ -f "app-release-signed.apk" ]; then
+            cp app-release-signed.apk ../SmartStock.apk
+          else
+            find . -name "*signed*.apk" -exec cp {} ../SmartStock.apk \;
+          fi
+
+      - name: Release Signed APK on GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: SmartStock v1.0.0 Signed Android APK
+          body: |
+            ## 📱 SmartStock Mobile App (Signed Release APK)
+            
+            This is the official **signed Android `.apk` package** for SmartStock Inventory Core.
+            
+            ### Installation Instructions:
+            1. Download **`SmartStock.apk`** below directly to your Android device.
+            2. Open the file to install (if prompted, allow "Install from unknown sources" for your browser/file manager).
+            3. Launch SmartStock and enjoy full mobile inventory management!
+          files: SmartStock.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
