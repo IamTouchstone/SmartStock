@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set up Java JDK 17
@@ -28,10 +28,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install NPM Dependencies
-        run: npm ci || npm install
+      - name: Install Dependencies
+        run: npm install
 
-      - name: Sync Capacitor Web Assets
+      - name: Sync Capacitor Android
         run: npx cap sync android
 
       - name: Make Gradle Executable
@@ -42,23 +42,23 @@ jobs:
           cd android
           ./gradlew assembleRelease --no-daemon
 
-      - name: Generate Keystore & Sign APK with apksigner
+      - name: Generate Keystore & Sign APK
         run: |
-          # Generate signing keystore
+          # Create keystore
           keytool -genkey -v -keystore android.keystore \
             -alias smartstock -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass smartstock123 -keypass smartstock123 \
             -dname "CN=SmartStock, OU=Development, O=SmartStock, L=City, S=State, C=US"
 
-          # Locate generated release APK
+          # Find release APK
           RAW_APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
-          echo "Found compiled release APK at: $RAW_APK"
+          echo "Found compiled release APK: $RAW_APK"
 
-          # Find android build-tools
+          # Find Android build tools
           BUILD_TOOLS=$(find $ANDROID_HOME/build-tools -maxdepth 1 -mindepth 1 | sort -V | tail -n 1)
-          echo "Using Android Build Tools at: $BUILD_TOOLS"
+          echo "Using Build Tools: $BUILD_TOOLS"
 
-          # Align & Sign explicitly using apksigner
+          # Align & Sign APK
           $BUILD_TOOLS/zipalign -v -f 4 "$RAW_APK" aligned.apk
           $BUILD_TOOLS/apksigner sign --ks android.keystore \
             --ks-key-alias smartstock \
@@ -68,32 +68,23 @@ jobs:
 
           # Verify signature
           $BUILD_TOOLS/apksigner verify SmartStock.apk
-          echo "Successfully created signed SmartStock.apk!"
+          echo "Signature verified successfully!"
 
-      - name: Delete Existing Release (if any)
-        run: |
-          gh release delete v1.0.0 --yes || true
-          git tag -d v1.0.0 || true
-          git push origin :refs/tags/v1.0.0 || true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish GitHub Release with Signed APK
-        uses: softprops/action-gh-release@v2
+      - name: Create or Update GitHub Release
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: v1.0.0
-          name: SmartStock v1.0.0 Signed Android APK (Capacitor)
+          artifacts: "SmartStock.apk"
+          tag: "v1.0.0"
+          name: "SmartStock v1.0.0 Signed Android APK"
           body: |
-            ## 📱 SmartStock Mobile App (Capacitor Signed Release APK)
+            ## 📱 SmartStock Mobile App (Signed Release APK)
             
             This is the official **signed Android `.apk` package** for SmartStock Inventory Core built using Capacitor.
             
             ### Installation Instructions:
             1. Download **`SmartStock.apk`** below directly to your Android device.
-            2. Open the file to install (if prompted, allow "Install from unknown sources" for your browser/file manager).
+            2. Open the file to install (allow "Install from unknown sources" if prompted).
             3. Launch SmartStock and enjoy full mobile inventory management!
-          files: SmartStock.apk
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true
+          recreateRelease: true
+          token: ${{ secrets.GITHUB_TOKEN }}
