@@ -2,8 +2,7 @@ name: Build & Release SmartStock APK
 
 on:
   push:
-    branches: [ main, master ]
-  workflow_dispatch:
+    branches: [ main ]
 
 permissions:
   contents: write
@@ -14,12 +13,10 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: 'npm'
-
       - run: npm ci
 
       - uses: expo/expo-github-action@v8
@@ -42,12 +39,4 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: SmartStock v1.0.${{ github.run_number }} APK
-          body: |
-            ## SmartStock Mobile App
-            Official signed Android APK built with Expo EAS.
-            
-            ### Install:
-            1. Download app-release.apk below
-            2. Allow "Install from unknown sources"
           files: app-release.apk
