@@ -2,7 +2,7 @@ name: Build & Release SmartStock APK
 
 on:
   push:
-    branches: [ main ] # Changed from master to main
+    branches: [ main, master ] # Supports both main and master
   workflow_dispatch:
 
 permissions:
