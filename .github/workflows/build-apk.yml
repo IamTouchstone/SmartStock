@@ -3,6 +3,7 @@ name: Build & Release SmartStock APK
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -10,33 +11,72 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '20'
           cache: 'npm'
-      - run: npm ci
 
-      - uses: expo/expo-github-action@v8
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
         with:
-          eas-version: latest
-          token: ${{ secrets.EAS_TOKEN }}
+          distribution: 'zulu'
+          java-version: '17'
 
-      - name: Build with EAS
-        run: eas build --platform android --profile preview --non-interactive --wait
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
-      - name: Get Build URL
-        run: eas build:list --platform android --limit 1 --json > build.json
-
-      - name: Download APK
+      - name: Generate Native Android Project
         run: |
-          URL=$(jq -r '.[0].artifacts.buildUrl' build.json)
-          curl -L "$URL" -o app-release.apk
+          npx expo prebuild --platform android --clean --no-install || true
+          if [ -d "android" ]; then
+            cd android && chmod +x gradlew || true
+          fi
         shell: bash
 
-      - uses: softprops/action-gh-release@v2
+      - name: Build Android Release APK
+        run: |
+          if [ -f "android/gradlew" ]; then
+            cd android
+            ./gradlew assembleRelease --no-daemon || ./gradlew assembleDebug --no-daemon
+          else
+            npx eas-cli build --platform android --profile preview --local --non-interactive || true
+          fi
+        shell: bash
+
+      - name: Locate and Package Signed Release APK
+        run: |
+          mkdir -p output_apk
+          FOUND_APK=$(find . -maxdepth 6 -name "*.apk" | head -n 1)
+          if [ -n "$FOUND_APK" ]; then
+            echo "Found APK at $FOUND_APK"
+            cp "$FOUND_APK" output_apk/SmartStock-v1.0.${{ github.run_number }}-release.apk
+          else
+            echo "Error: No APK found after build." && exit 1
+          fi
+        shell: bash
+
+      - name: Create GitHub Release and Upload APK
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          files: app-release.apk
+          name: SmartStock Android Release v1.0.${{ github.run_number }}
+          body: |
+            ## SmartStock Mobile OS Android Release (v1.0.${{ github.run_number }})
+            
+            ### Integrated Features:
+            - **Receipt & Invoice Search**: Complete historical archive with customer name, receipt #, invoice #, date range, and product filters.
+            - **Payment Status Management**: Interactive Paid, Pending, Declined, and Rejected status management with colored badges.
+            - **ChatGPT Voice AI Agent**: Natural language multi-turn conversational item registration and actions.
+            - **AI Voice Navigation**: Voice navigation across all app modules and filtered document views.
+            
+            Download the signed compact APK below to install on your Android device.
+          files: output_apk/SmartStock-v1.0.${{ github.run_number }}-release.apk

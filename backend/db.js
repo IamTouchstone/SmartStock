@@ -72,6 +72,16 @@ function initDB() {
       db.stock_adjustments = [];
       updated = true;
     }
+    // Ensure invoices array exists
+    if (!db.invoices || db.invoices.length === 0) {
+      db.invoices = getInitialInvoices();
+      updated = true;
+    }
+    // Ensure receipts array exists
+    if (!db.receipts || db.receipts.length === 0) {
+      db.receipts = getInitialReceipts();
+      updated = true;
+    }
 
     if (updated) {
       writeDB(db);
@@ -198,6 +208,67 @@ function getInitialCategories() {
     { org_id: DEFAULT_ORG_ID, name: "Packaging & Delivery" },
     { org_id: DEFAULT_ORG_ID, name: "Office Stationery" },
     { org_id: DEFAULT_ORG_ID, name: "General Retail" }
+  ];
+}
+
+function getInitialInvoices() {
+  return [
+    {
+      org_id: DEFAULT_ORG_ID,
+      id: "INV-2026-001",
+      invoice_number: "INV-2026-001",
+      receipt_number: "REC-2026-001",
+      customer_name: "Apex Electronics",
+      supplier_name: "Apex Logistics Ltd",
+      date: "2026-07-28",
+      branch_name: "Main Warehouse",
+      payment_status: "Paid",
+      type: "invoice",
+      items: [
+        { sku: "TS-100", name: "EcoSmart Smart Thermostat", qty: 10, price: 149.99, subtotal: 1499.90 }
+      ],
+      total_amount: 1499.90,
+      created_at: new Date(Date.now() - 3 * 86400000).toISOString()
+    },
+    {
+      org_id: DEFAULT_ORG_ID,
+      id: "INV-2026-002",
+      invoice_number: "INV-2026-002",
+      receipt_number: "REC-2026-002",
+      customer_name: "Global Retail Mart",
+      supplier_name: "Lumina Global",
+      date: "2026-07-30",
+      branch_name: "North Branch",
+      payment_status: "Pending",
+      type: "invoice",
+      items: [
+        { sku: "WC-500", name: "Titan 3-in-1 Wireless Charger", qty: 25, price: 49.99, subtotal: 1249.75 }
+      ],
+      total_amount: 1249.75,
+      created_at: new Date(Date.now() - 1 * 86400000).toISOString()
+    }
+  ];
+}
+
+function getInitialReceipts() {
+  return [
+    {
+      org_id: DEFAULT_ORG_ID,
+      id: "REC-2026-101",
+      receipt_number: "REC-2026-101",
+      invoice_number: "INV-2026-001",
+      customer_name: "Alice Johnson",
+      supplier_name: "SmartStock Direct",
+      date: "2026-07-29",
+      branch_name: "Main Warehouse",
+      payment_status: "Paid",
+      type: "receipt",
+      items: [
+        { sku: "LL-800", name: "Nova Smart LED Bulb Pack", qty: 5, price: 29.99, subtotal: 149.95 }
+      ],
+      total_amount: 149.95,
+      created_at: new Date(Date.now() - 2 * 86400000).toISOString()
+    }
   ];
 }
 
@@ -362,7 +433,8 @@ function getSeedData() {
     settings,
     suppliers,
     purchaseOrders,
-    invoices: [],
+    invoices: getInitialInvoices(),
+    receipts: getInitialReceipts(),
     categories: getInitialCategories()
   };
 }

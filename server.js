@@ -468,6 +468,12 @@ const requestHandler = (req, res) => {
     return sendJSON(res, orgInvoices);
   }
 
+  if (pathname === '/api/receipts' && method === 'GET') {
+    const db = readDB();
+    const orgReceipts = (db.receipts || []).filter(rec => rec.org_id === org_id);
+    return sendJSON(res, orgReceipts);
+  }
+
   if (pathname === '/api/settings' && method === 'GET') {
     const db = readDB();
     const regConfig = getIClassRegistryConfig();
@@ -1709,11 +1715,16 @@ const requestHandler = (req, res) => {
         const invoice = {
           org_id,
           id: invoice_id,
+          invoice_number: body.invoice_number || invoice_id,
+          receipt_number: body.receipt_number || `REC-${invoice_id}`,
+          customer_name: body.customer_name || supplier_name,
           supplier_name,
           date: date || new Date().toISOString().split('T')[0],
           branch_name,
           items: processedItems,
           total_amount: Number(total_amount) || processedItems.reduce((acc, curr) => acc + curr.subtotal, 0),
+          payment_status: body.payment_status || "Pending",
+          type: body.type || "invoice",
           created_at: new Date().toISOString()
         };
 
@@ -1728,7 +1739,7 @@ const requestHandler = (req, res) => {
           channel: "System Audit",
           recipient: "Inventory Ledger",
           type: "Invoice Logged",
-          message: `Invoice ${invoice_id} from ${supplier_name} successfully documented. Added ${processedItems.length} items to ${branch_name}.`,
+          message: `Invoice ${invoice_id} from ${supplier_name} successfully documented. Added ${processedItems.length} items to ${branch_name}. Status: ${invoice.payment_status}.`,
           timestamp: new Date().toISOString()
         });
 
@@ -1738,6 +1749,62 @@ const requestHandler = (req, res) => {
           message: "Invoice successfully documented and inventory counts updated.",
           invoice
         });
+      }
+
+      // 9.6.1 UPDATE INVOICE / RECEIPT PAYMENT STATUS
+      if (pathname === '/api/invoices/status' && method === 'POST') {
+        const { id, payment_status } = body;
+        if (!id || !payment_status) {
+          return sendJSON(res, { error: "Missing document id or payment_status." }, 400);
+        }
+        const db = readDB();
+        let doc = (db.invoices || []).find(i => i.id === id && i.org_id === org_id);
+        if (!doc) {
+          doc = (db.receipts || []).find(r => r.id === id && r.org_id === org_id);
+        }
+        if (!doc) {
+          return sendJSON(res, { error: "Document not found." }, 404);
+        }
+        doc.payment_status = payment_status;
+        writeDB(db);
+        logActivity(req, `Updated payment status of ${id} to ${payment_status}`);
+        return sendJSON(res, { message: "Payment status updated successfully.", document: doc });
+      }
+
+      // 9.6.2 POST RECEIPT DOCUMENTATION
+      if (pathname === '/api/receipts' && method === 'POST') {
+        const db = readDB();
+        const { receipt_id, customer_name, supplier_name, date, branch_name, items, total_amount, payment_status } = body;
+        const id = receipt_id || `REC-${Math.floor(1000 + Math.random() * 9000)}`;
+        const processedItems = (items || []).map(item => ({
+          sku: item.sku || 'SKU-GEN',
+          name: item.name || 'Item',
+          qty: Number(item.qty) || 1,
+          price: Number(item.price) || 0,
+          subtotal: Number(((Number(item.qty)||1) * (Number(item.price)||0)).toFixed(2))
+        }));
+
+        const receipt = {
+          org_id,
+          id,
+          receipt_number: id,
+          invoice_number: body.invoice_number || `INV-${id}`,
+          customer_name: customer_name || "Walk-in Customer",
+          supplier_name: supplier_name || "SmartStock Store",
+          date: date || new Date().toISOString().split('T')[0],
+          branch_name: branch_name || "Main Warehouse",
+          items: processedItems,
+          total_amount: Number(total_amount) || processedItems.reduce((a, b) => a + b.subtotal, 0),
+          payment_status: payment_status || "Paid",
+          type: "receipt",
+          created_at: new Date().toISOString()
+        };
+
+        if (!db.receipts) db.receipts = [];
+        db.receipts.push(receipt);
+        writeDB(db);
+
+        return sendJSON(res, { message: "Receipt saved successfully.", receipt });
       }
 
       // 9.7 EXPIRY REPORTS POST
