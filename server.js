@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const { initDB, readDB, writeDB, seedNewOrganization, DEFAULT_ORG_ID } = require('./backend/db');
+const PDFDocument = require('pdfkit');
 
 const PORT = process.env.PORT || 5000;
 
@@ -462,16 +463,125 @@ const requestHandler = (req, res) => {
     return sendJSON(res, orgLogs);
   }
 
+  // GET all invoices
   if (pathname === '/api/invoices' && method === 'GET') {
     const db = readDB();
     const orgInvoices = (db.invoices || []).filter(inv => inv.org_id === org_id);
     return sendJSON(res, orgInvoices);
   }
 
-  if (pathname === '/api/receipts' && method === 'GET') {
+  // POST create a new invoice
+  if (pathname === '/api/invoices' && method === 'POST') {
     const db = readDB();
-    const orgReceipts = (db.receipts || []).filter(rec => rec.org_id === org_id);
-    return sendJSON(res, orgReceipts);
+    const { receipt_number, invoice_number, customer_name, date, product_name, amount, payment_status } = body;
+    if (!receipt_number || !invoice_number || !customer_name || !date) {
+      return sendJSON(res, { error: 'Missing required invoice fields.' }, 400);
+    }
+    const allowedStatuses = ['Pending', 'Paid', 'Overdue'];
+    const status = allowedStatuses.includes(payment_status) ? payment_status : 'Pending';
+    const newInvoice = {
+      id: `INV-${Math.floor(1000 + Math.random() * 9000)}` ,
+      org_id,
+      receipt_number,
+      invoice_number,
+      customer_name,
+      date,
+      product_name: product_name || '',
+      amount: amount || 0,
+      payment_status: status
+    };
+    if (!db.invoices) db.invoices = [];
+    db.invoices.push(newInvoice);
+    writeDB(db);
+    logActivity(req, `Created invoice ${newInvoice.id}`);
+    return sendJSON(res, { message: 'Invoice created', invoice: newInvoice }, 201);
+  }
+
+  // PATCH update invoice status
+  if (pathname.startsWith('/api/invoices/') && method === 'PATCH') {
+    const invoiceId = pathname.split('/')[3];
+    const { payment_status } = body;
+    const allowedStatuses = ['Pending', 'Paid', 'Overdue'];
+    if (!allowedStatuses.includes(payment_status)) {
+      return sendJSON(res, { error: 'Invalid payment_status value' }, 400);
+    }
+    const db = readDB();
+    const inv = (db.invoices || []).find(i => i.id === invoiceId && i.org_id === org_id);
+    if (!inv) {
+      return sendJSON(res, { error: 'Invoice not found' }, 404);
+    }
+    inv.payment_status = payment_status;
+    writeDB(db);
+    logActivity(req, `Updated invoice ${invoiceId} status to ${payment_status}`);
+    return sendJSON(res, { message: 'Status updated', invoice: inv });
+  }
+
+  // GET PDF for a specific invoice
+  if (pathname.match(/^\/api\/invoices\/[^\/]+\/pdf$/) && method === 'GET') {
+    const parts = pathname.split('/');
+    const invoiceId = parts[3];
+    const db = readDB();
+    const inv = (db.invoices || []).find(i => i.id === invoiceId && i.org_id === org_id);
+    if (!inv) {
+      return sendJSON(res, { error: 'Invoice not found' }, 404);
+    }
+    const doc = new PDFDocument();
+    res.writeHead(200, {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${invoiceId}.pdf"`
+    });
+    doc.pipe(res);
+    doc.fontSize(20).text('Invoice', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(12).text(`Invoice ID: ${inv.id}`);
+    doc.text(`Receipt Number: ${inv.receipt_number}`);
+    doc.text(`Customer: ${inv.customer_name}`);
+    doc.text(`Date: ${new Date(inv.date).toLocaleDateString()}`);
+    doc.text(`Payment Status: ${inv.payment_status}`);
+    doc.moveDown();
+    doc.text('Items:', { underline: true });
+    inv.items && inv.items.forEach(item => {
+      doc.text(`- ${item.name} (${item.sku}): ${item.qty} x $${item.price.toFixed(2)} = $${(item.qty * item.price).toFixed(2)}`);
+    });
+    const total = inv.items ? inv.items.reduce((sum, it) => sum + it.qty * it.price, 0) : 0;
+    doc.moveDown();
+    doc.text(`Total Amount: $${total.toFixed(2)}`, { bold: true });
+    doc.end();
+    return; // response already handled
+  }
+
+  // GET search invoices with query params
+  if (pathname === '/api/invoices/search' && method === 'GET') {
+    const db = readDB();
+    const q = parsedUrl.query;
+    let results = (db.invoices || []).filter(inv => inv.org_id === org_id);
+    if (q.customer_name) {
+      results = results.filter(i => i.customer_name.toLowerCase().includes(q.customer_name.toLowerCase()));
+    }
+    if (q.receipt_number) {
+      results = results.filter(i => i.receipt_number.toLowerCase().includes(q.receipt_number.toLowerCase()));
+    }
+    if (q.invoice_number) {
+      results = results.filter(i => i.invoice_number.toLowerCase().includes(q.invoice_number.toLowerCase()));
+    }
+    if (q.product_name) {
+      results = results.filter(i => i.product_name && i.product_name.toLowerCase().includes(q.product_name.toLowerCase()));
+    }
+    if (q.payment_status) {
+      results = results.filter(i => i.payment_status && i.payment_status.toLowerCase() === q.payment_status.toLowerCase());
+    }
+    if (q.date) {
+      results = results.filter(i => i.date && i.date.startsWith(q.date));
+    }
+    if (q.start_date && q.end_date) {
+      const start = new Date(q.start_date);
+      const end = new Date(q.end_date);
+      results = results.filter(i => {
+        const d = new Date(i.date);
+        return d >= start && d <= end;
+      });
+    }
+    return sendJSON(res, results);
   }
 
   if (pathname === '/api/settings' && method === 'GET') {
@@ -596,7 +706,30 @@ const requestHandler = (req, res) => {
   if (method === 'POST') {
     let bodyStr = '';
     req.on('data', chunk => { bodyStr += chunk; });
-    req.on('end', () => {
+    req.on('end',function speakText(text) {
+  if (!voiceResponsesEnabled) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = voiceLanguage;
+  utterance.rate = speechSpeed;
+  utterance.volume = voiceVolume;
+  // Prefer male voice if available
+  const maleVoice = speechSynthesis.getVoices().find(v => /male/i.test(v.name)) || speechSynthesis.getVoices()[0];
+  utterance.voice = maleVoice;
+
+  utterance.onstart = () => {
+    isAssistantSpeaking = true;
+    if (recognition && isVoiceListening) {
+      try { recognition.abort(); } catch (e) {};
+    }
+  };
+
+  utterance.onend = () => {
+    isAssistantSpeaking = false;
+  };
+
+  window.speechSynthesis.speak(utterance);
+} {
       let body = {};
       try { body = JSON.parse(bodyStr || '{}'); } catch (e) {}
 
@@ -1715,16 +1848,11 @@ const requestHandler = (req, res) => {
         const invoice = {
           org_id,
           id: invoice_id,
-          invoice_number: body.invoice_number || invoice_id,
-          receipt_number: body.receipt_number || `REC-${invoice_id}`,
-          customer_name: body.customer_name || supplier_name,
           supplier_name,
           date: date || new Date().toISOString().split('T')[0],
           branch_name,
           items: processedItems,
           total_amount: Number(total_amount) || processedItems.reduce((acc, curr) => acc + curr.subtotal, 0),
-          payment_status: body.payment_status || "Pending",
-          type: body.type || "invoice",
           created_at: new Date().toISOString()
         };
 
@@ -1739,7 +1867,7 @@ const requestHandler = (req, res) => {
           channel: "System Audit",
           recipient: "Inventory Ledger",
           type: "Invoice Logged",
-          message: `Invoice ${invoice_id} from ${supplier_name} successfully documented. Added ${processedItems.length} items to ${branch_name}. Status: ${invoice.payment_status}.`,
+          message: `Invoice ${invoice_id} from ${supplier_name} successfully documented. Added ${processedItems.length} items to ${branch_name}.`,
           timestamp: new Date().toISOString()
         });
 
@@ -1749,62 +1877,6 @@ const requestHandler = (req, res) => {
           message: "Invoice successfully documented and inventory counts updated.",
           invoice
         });
-      }
-
-      // 9.6.1 UPDATE INVOICE / RECEIPT PAYMENT STATUS
-      if (pathname === '/api/invoices/status' && method === 'POST') {
-        const { id, payment_status } = body;
-        if (!id || !payment_status) {
-          return sendJSON(res, { error: "Missing document id or payment_status." }, 400);
-        }
-        const db = readDB();
-        let doc = (db.invoices || []).find(i => i.id === id && i.org_id === org_id);
-        if (!doc) {
-          doc = (db.receipts || []).find(r => r.id === id && r.org_id === org_id);
-        }
-        if (!doc) {
-          return sendJSON(res, { error: "Document not found." }, 404);
-        }
-        doc.payment_status = payment_status;
-        writeDB(db);
-        logActivity(req, `Updated payment status of ${id} to ${payment_status}`);
-        return sendJSON(res, { message: "Payment status updated successfully.", document: doc });
-      }
-
-      // 9.6.2 POST RECEIPT DOCUMENTATION
-      if (pathname === '/api/receipts' && method === 'POST') {
-        const db = readDB();
-        const { receipt_id, customer_name, supplier_name, date, branch_name, items, total_amount, payment_status } = body;
-        const id = receipt_id || `REC-${Math.floor(1000 + Math.random() * 9000)}`;
-        const processedItems = (items || []).map(item => ({
-          sku: item.sku || 'SKU-GEN',
-          name: item.name || 'Item',
-          qty: Number(item.qty) || 1,
-          price: Number(item.price) || 0,
-          subtotal: Number(((Number(item.qty)||1) * (Number(item.price)||0)).toFixed(2))
-        }));
-
-        const receipt = {
-          org_id,
-          id,
-          receipt_number: id,
-          invoice_number: body.invoice_number || `INV-${id}`,
-          customer_name: customer_name || "Walk-in Customer",
-          supplier_name: supplier_name || "SmartStock Store",
-          date: date || new Date().toISOString().split('T')[0],
-          branch_name: branch_name || "Main Warehouse",
-          items: processedItems,
-          total_amount: Number(total_amount) || processedItems.reduce((a, b) => a + b.subtotal, 0),
-          payment_status: payment_status || "Paid",
-          type: "receipt",
-          created_at: new Date().toISOString()
-        };
-
-        if (!db.receipts) db.receipts = [];
-        db.receipts.push(receipt);
-        writeDB(db);
-
-        return sendJSON(res, { message: "Receipt saved successfully.", receipt });
       }
 
       // 9.7 EXPIRY REPORTS POST

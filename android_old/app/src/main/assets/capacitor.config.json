@@ -1,0 +1,11 @@
+{
+	"appId": "com.smartstock.app",
+	"appName": "SmartStock",
+	"webDir": "public",
+	"server": {
+		"androidScheme": "https",
+		"allowNavigation": [
+			"smart-stock-seven.vercel.app"
+		]
+	}
+}

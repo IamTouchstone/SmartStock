@@ -22,7 +22,58 @@ let cameraPermissionGranted = false;
 document.addEventListener('DOMContentLoaded', () => {
   initOnboardingFlow();
   initVoiceAndPicker();
+  // Invoice search form submission handler
+  const searchForm = document.getElementById('invoice-search-form');
+  if (searchForm) {
+    searchForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const params = new URLSearchParams();
+      const cust = document.getElementById('search-customer').value.trim();
+      if (cust) params.append('customer_name', cust);
+      const receipt = document.getElementById('search-receipt').value.trim();
+      if (receipt) params.append('receipt_number', receipt);
+      const invoice = document.getElementById('search-invoice').value.trim();
+      if (invoice) params.append('invoice_number', invoice);
+      const product = document.getElementById('search-product').value.trim();
+      if (product) params.append('product_name', product);
+      const date = document.getElementById('search-date').value;
+      if (date) params.append('date', date);
+      const start = document.getElementById('search-start-date').value;
+      const end = document.getElementById('search-end-date').value;
+      if (start && end) { params.append('start_date', start); params.append('end_date', end); }
+      const status = document.getElementById('search-status').value;
+      if (status) params.append('payment_status', status);
+      const res = await authFetch(`/api/invoices/search?${params.toString()}`);
+      if (res.ok) { const data = await res.json(); loadInvoiceLedger(data); } else { showToast('Search failed'); }
+    });
+  }
 });
+
+  // Invoice search form submission handler
+  const searchForm = document.getElementById('invoice-search-form');
+  if (searchForm) {
+    searchForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const params = new URLSearchParams();
+      const cust = document.getElementById('search-customer').value.trim();
+      if (cust) params.append('customer_name', cust);
+      const receipt = document.getElementById('search-receipt').value.trim();
+      if (receipt) params.append('receipt_number', receipt);
+      const invoice = document.getElementById('search-invoice').value.trim();
+      if (invoice) params.append('invoice_number', invoice);
+      const product = document.getElementById('search-product').value.trim();
+      if (product) params.append('product_name', product);
+      const date = document.getElementById('search-date').value;
+      if (date) params.append('date', date);
+      const start = document.getElementById('search-start-date').value;
+      const end = document.getElementById('search-end-date').value;
+      if (start && end) { params.append('start_date', start); params.append('end_date', end); }
+      const status = document.getElementById('search-status').value;
+      if (status) params.append('payment_status', status);
+      const res = await authFetch(`/api/invoices/search?${params.toString()}`);
+      if (res.ok) { const data = await res.json(); loadInvoiceLedger(data); } else { showToast('Search failed'); }
+    });
+  }
 
 // ----------------------------------------------------
 // ONBOARDING SPLASH & WALKTHROUGH FLOW
@@ -279,7 +330,12 @@ function switchTab(tabName) {
     loadPurchaseList();
   }
   if (tabName === 'requests') switchReqModule(activeReqModule);
-  if (tabName === 'scanner') renderScanQueue();
+  if (tabName === 'scanner') {
+    renderScanQueue();
+    requestCameraPermissionDirectly();
+  } else {
+    stopIntakeBarcodeScanner();
+  }
   if (tabName === 'more') loadMoreTabOptions();
 }
 
@@ -460,71 +516,215 @@ async function submitNewProductManual(e) {
 }
 
 // ----------------------------------------------------
-// 3. BARCODE SCANNER
+// 3. BARCODE SCANNER & CAMERA INTAKE
 // ----------------------------------------------------
+let html5QrcodeScanner = null;
+let currentCameraFacingMode = "environment"; // Default to back camera
+let cameraPermissionGranted = false;
+
 async function requestCameraPermissionDirectly() {
   const permBox = document.getElementById('camera-permission-box');
-  const laser = document.getElementById('scanner-viewport-laser');
-  const camBtn = document.getElementById('btn-camera-toggle');
+  const permTitle = document.getElementById('camera-perm-title');
+  const permDesc = document.getElementById('camera-perm-desc');
+  const permBtn = document.getElementById('camera-perm-btn');
   const status = document.getElementById('camera-mode-status');
+  const laser = document.getElementById('scanner-viewport-laser');
+
+  // Request runtime camera permission in Capacitor Android if present
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Camera) {
+    try {
+      await window.Capacitor.Plugins.Camera.requestPermissions();
+    } catch (e) {
+      console.warn("Capacitor camera permission request notice:", e);
+    }
+  }
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: currentCameraFacingMode } }
+    });
+    // Stop temporary check stream
     stream.getTracks().forEach(track => track.stop());
 
     cameraPermissionGranted = true;
-    permBox.style.display = 'none';
-    laser.style.display = 'block';
-    camBtn.style.display = 'inline-flex';
-    status.innerText = scannerCamera === 'back' ? "Camera: Environment (Back)" : "Camera: User (Front)";
+    if (permBox) permBox.style.display = 'none';
+    if (laser) laser.style.display = 'block';
+    
     showToast("Camera access approved.");
+    startIntakeBarcodeScanner();
   } catch (err) {
+    console.error("Camera permission error:", err);
     cameraPermissionGranted = false;
-    permBox.style.display = 'block';
-    laser.style.display = 'none';
-    camBtn.style.display = 'none';
-    status.innerText = "Camera: Permission Denied";
+    if (permBox) permBox.style.display = 'block';
+    if (permTitle) permTitle.innerText = "Camera: Permission Denied";
+    if (permDesc) permDesc.innerText = "SmartStock needs camera permissions to start the barcode reader sensor. Click retry below or enable camera in device settings.";
+    if (permBtn) permBtn.innerText = "Retry Camera Permission";
+    if (status) {
+      status.style.display = 'block';
+      status.innerText = "Camera: Permission Denied";
+    }
+    if (laser) laser.style.display = 'none';
     showToast("Camera access rejected or unavailable.");
   }
 }
 
-function toggleScannerCamera() {
-  if (!cameraPermissionGranted) {
-    showToast("Grant camera permission before switching streams.");
+async function startIntakeBarcodeScanner() {
+  const readerDiv = document.getElementById('reader');
+  const status = document.getElementById('camera-mode-status');
+  const toggleBtn = document.getElementById('btn-camera-toggle');
+  const laser = document.getElementById('scanner-viewport-laser');
+
+  if (!readerDiv) return;
+
+  await stopIntakeBarcodeScanner();
+
+  if (typeof Html5Qrcode === 'undefined') {
+    console.warn("Html5Qrcode library not loaded yet.");
+    if (status) {
+      status.style.display = 'block';
+      status.innerText = '⚠️ Scanner engine loading... Type SKU manually below.';
+    }
     return;
   }
 
-  const statusEl = document.getElementById('camera-mode-status');
-  if (scannerCamera === 'back') {
-    scannerCamera = 'front';
-    statusEl.innerText = "Camera: User (Front)";
-    showToast("Switched barcode scanner to User (Front) camera");
-  } else {
-    scannerCamera = 'back';
-    statusEl.innerText = "Camera: Environment (Back)";
-    showToast("Switched barcode scanner to Environment (Back) camera");
+  try {
+    const html5QrCode = new Html5Qrcode("reader");
+    html5QrcodeScanner = html5QrCode;
+
+    const config = {
+      fps: 15,
+      qrbox: { width: 250, height: 150 },
+      aspectRatio: 1.777778
+    };
+
+    if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+      config.formatsToSupport = [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.DATA_MATRIX
+      ];
+    }
+
+    const cameraConfig = { facingMode: currentCameraFacingMode };
+
+    await html5QrCode.start(
+      cameraConfig,
+      config,
+      (decodedText, decodedResult) => {
+        console.log("Barcode scanned:", decodedText);
+        onIntakeBarcodeScanned(decodedText);
+      },
+      (errorMessage) => {
+        // Continuous scan frame callback - ignore
+      }
+    );
+
+    if (toggleBtn) toggleBtn.style.display = 'inline-flex';
+    if (status) status.style.display = 'none';
+    if (laser) laser.style.display = 'block';
+
+  } catch (err) {
+    console.warn("Html5Qrcode start exception:", err);
+    if (status) {
+      status.style.display = 'block';
+      status.innerText = `Camera: ${currentCameraFacingMode === 'user' ? 'Front' : 'Back'} Camera Ready`;
+    }
   }
 }
 
-function processBarcodeScan() {
+function onIntakeBarcodeScanned(skuValue) {
+  if (!skuValue) return;
+
+  const skuInput = document.getElementById('scanner-barcode-input');
+  if (skuInput) {
+    skuInput.value = skuValue.trim().toUpperCase();
+  }
+
+  showToast(`✅ Barcode Scanned: ${skuValue}`);
+  
+  // Stop scanning after successful scan as required
+  stopIntakeBarcodeScanner();
+}
+
+async function toggleScannerCamera() {
+  currentCameraFacingMode = (currentCameraFacingMode === "environment" || currentCameraFacingMode === "back") ? "user" : "environment";
+  const status = document.getElementById('camera-mode-status');
+  if (status) {
+    status.style.display = 'block';
+    status.innerText = `Switching to ${currentCameraFacingMode === 'user' ? 'Front' : 'Back'} Camera...`;
+  }
+  showToast(`Switching camera stream to ${currentCameraFacingMode === 'user' ? 'Front' : 'Back'} camera`);
+  
+  if (cameraPermissionGranted) {
+    await startIntakeBarcodeScanner();
+  } else {
+    await requestCameraPermissionDirectly();
+  }
+}
+
+async function stopIntakeBarcodeScanner() {
+  if (html5QrcodeScanner) {
+    try {
+      if (html5QrcodeScanner.isScanning) {
+        await html5QrcodeScanner.stop();
+      }
+      html5QrcodeScanner.clear();
+    } catch (e) {
+      console.warn("Error stopping scanner:", e);
+    }
+    html5QrcodeScanner = null;
+  }
+}
+
+async function processBarcodeScan() {
   const input = document.getElementById('scanner-barcode-input');
-  const sku = input.value.trim().toUpperCase();
+  const sku = input ? input.value.trim().toUpperCase() : '';
 
   if (!sku) {
-    showToast('Please type or scan a product SKU');
+    showToast('Please scan a barcode or type a product SKU');
     return;
   }
 
   const scanRecord = {
+    id: 'SCAN-' + Date.now(),
     sku,
     timestamp: new Date().toLocaleTimeString(),
+    date: new Date().toISOString(),
+    status: 'Registered',
     mode: isOfflineMode ? 'Cached Offline' : 'Live Reconciled'
   };
 
   localCache.scans.unshift(scanRecord);
+  saveLocalCache();
   renderScanQueue();
-  showToast(`Recorded SKU ${sku}`);
-  input.value = '';
+
+  // Try backend API registration if available
+  try {
+    const res = await fetch(`${API_BASE}/api/inventory/intake`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sku, name: `Scanned Item ${sku}`, quantity: 1 })
+    });
+    if (res.ok) {
+      showToast(`Item ${sku} registered & saved to Inventory DB!`);
+    } else {
+      showToast(`Item ${sku} saved to local intake queue.`);
+    }
+  } catch (err) {
+    showToast(`Item ${sku} saved locally (Offline mode).`);
+  }
+
+  if (input) input.value = '';
+
+  // Restart scanner for next barcode scan if camera permission granted
+  if (cameraPermissionGranted) {
+    setTimeout(() => startIntakeBarcodeScanner(), 500);
+  }
 }
 
 function renderScanQueue() {
@@ -1955,7 +2155,9 @@ function switchScannerSubTab(sub) {
     document.getElementById('btn-scanner-subtab-barcode').style.background = 'var(--color-purple-primary)';
     document.getElementById('btn-scanner-subtab-barcode').style.color = 'white';
     document.getElementById('scanner-view-barcode').style.display = 'block';
+    requestCameraPermissionDirectly();
   } else {
+    stopIntakeBarcodeScanner();
     document.getElementById('btn-scanner-subtab-ocr').className = 'btn';
     document.getElementById('btn-scanner-subtab-ocr').style.background = 'var(--color-purple-primary)';
     document.getElementById('btn-scanner-subtab-ocr').style.color = 'white';
@@ -2147,16 +2349,21 @@ function resetOcrScanner() {
   document.getElementById('ocr-results-card').style.display = 'none';
 }
 
-async function loadInvoiceLedger() {
+async function loadInvoiceLedger(invoicesData) {
   const container = document.getElementById('invoice-ledger-list');
   if (!container) return;
   container.innerHTML = '';
 
   try {
-    const res = await authFetch('/api/invoices');
-    if (!res.ok) return;
-
-    const invoices = await res.json();
+    // If invoicesData is provided (e.g., from a search), use it; otherwise fetch all invoices
+    let invoices;
+    if (invoicesData) {
+      invoices = invoicesData;
+    } else {
+      const res = await authFetch('/api/invoices');
+      if (!res.ok) return;
+      invoices = await res.json();
+    }
     if (invoices.length === 0) {
       container.innerHTML = `<div style="text-align: center; color: var(--text-dim); padding: 1rem;">No documented invoices yet.</div>`;
       return;

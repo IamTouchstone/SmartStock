@@ -22,7 +22,58 @@ let cameraPermissionGranted = false;
 document.addEventListener('DOMContentLoaded', () => {
   initOnboardingFlow();
   initVoiceAndPicker();
+  // Invoice search form submission handler
+  const searchForm = document.getElementById('invoice-search-form');
+  if (searchForm) {
+    searchForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const params = new URLSearchParams();
+      const cust = document.getElementById('search-customer').value.trim();
+      if (cust) params.append('customer_name', cust);
+      const receipt = document.getElementById('search-receipt').value.trim();
+      if (receipt) params.append('receipt_number', receipt);
+      const invoice = document.getElementById('search-invoice').value.trim();
+      if (invoice) params.append('invoice_number', invoice);
+      const product = document.getElementById('search-product').value.trim();
+      if (product) params.append('product_name', product);
+      const date = document.getElementById('search-date').value;
+      if (date) params.append('date', date);
+      const start = document.getElementById('search-start-date').value;
+      const end = document.getElementById('search-end-date').value;
+      if (start && end) { params.append('start_date', start); params.append('end_date', end); }
+      const status = document.getElementById('search-status').value;
+      if (status) params.append('payment_status', status);
+      const res = await authFetch(`/api/invoices/search?${params.toString()}`);
+      if (res.ok) { const data = await res.json(); loadInvoiceLedger(data); } else { showToast('Search failed'); }
+    });
+  }
 });
+
+  // Invoice search form submission handler
+  const searchForm = document.getElementById('invoice-search-form');
+  if (searchForm) {
+    searchForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const params = new URLSearchParams();
+      const cust = document.getElementById('search-customer').value.trim();
+      if (cust) params.append('customer_name', cust);
+      const receipt = document.getElementById('search-receipt').value.trim();
+      if (receipt) params.append('receipt_number', receipt);
+      const invoice = document.getElementById('search-invoice').value.trim();
+      if (invoice) params.append('invoice_number', invoice);
+      const product = document.getElementById('search-product').value.trim();
+      if (product) params.append('product_name', product);
+      const date = document.getElementById('search-date').value;
+      if (date) params.append('date', date);
+      const start = document.getElementById('search-start-date').value;
+      const end = document.getElementById('search-end-date').value;
+      if (start && end) { params.append('start_date', start); params.append('end_date', end); }
+      const status = document.getElementById('search-status').value;
+      if (status) params.append('payment_status', status);
+      const res = await authFetch(`/api/invoices/search?${params.toString()}`);
+      if (res.ok) { const data = await res.json(); loadInvoiceLedger(data); } else { showToast('Search failed'); }
+    });
+  }
 
 // ----------------------------------------------------
 // ONBOARDING SPLASH & WALKTHROUGH FLOW
@@ -279,7 +330,12 @@ function switchTab(tabName) {
     loadPurchaseList();
   }
   if (tabName === 'requests') switchReqModule(activeReqModule);
-  if (tabName === 'scanner') renderScanQueue();
+  if (tabName === 'scanner') {
+    renderScanQueue();
+    requestCameraPermissionDirectly();
+  } else {
+    stopIntakeBarcodeScanner();
+  }
   if (tabName === 'more') loadMoreTabOptions();
 }
 
@@ -460,71 +516,215 @@ async function submitNewProductManual(e) {
 }
 
 // ----------------------------------------------------
-// 3. BARCODE SCANNER
+// 3. BARCODE SCANNER & CAMERA INTAKE
 // ----------------------------------------------------
+let html5QrcodeScanner = null;
+let currentCameraFacingMode = "environment"; // Default to back camera
+let cameraPermissionGranted = false;
+
 async function requestCameraPermissionDirectly() {
   const permBox = document.getElementById('camera-permission-box');
-  const laser = document.getElementById('scanner-viewport-laser');
-  const camBtn = document.getElementById('btn-camera-toggle');
+  const permTitle = document.getElementById('camera-perm-title');
+  const permDesc = document.getElementById('camera-perm-desc');
+  const permBtn = document.getElementById('camera-perm-btn');
   const status = document.getElementById('camera-mode-status');
+  const laser = document.getElementById('scanner-viewport-laser');
+
+  // Request runtime camera permission in Capacitor Android if present
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Camera) {
+    try {
+      await window.Capacitor.Plugins.Camera.requestPermissions();
+    } catch (e) {
+      console.warn("Capacitor camera permission request notice:", e);
+    }
+  }
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: currentCameraFacingMode } }
+    });
+    // Stop temporary check stream
     stream.getTracks().forEach(track => track.stop());
 
     cameraPermissionGranted = true;
-    permBox.style.display = 'none';
-    laser.style.display = 'block';
-    camBtn.style.display = 'inline-flex';
-    status.innerText = scannerCamera === 'back' ? "Camera: Environment (Back)" : "Camera: User (Front)";
+    if (permBox) permBox.style.display = 'none';
+    if (laser) laser.style.display = 'block';
+    
     showToast("Camera access approved.");
+    startIntakeBarcodeScanner();
   } catch (err) {
+    console.error("Camera permission error:", err);
     cameraPermissionGranted = false;
-    permBox.style.display = 'block';
-    laser.style.display = 'none';
-    camBtn.style.display = 'none';
-    status.innerText = "Camera: Permission Denied";
+    if (permBox) permBox.style.display = 'block';
+    if (permTitle) permTitle.innerText = "Camera: Permission Denied";
+    if (permDesc) permDesc.innerText = "SmartStock needs camera permissions to start the barcode reader sensor. Click retry below or enable camera in device settings.";
+    if (permBtn) permBtn.innerText = "Retry Camera Permission";
+    if (status) {
+      status.style.display = 'block';
+      status.innerText = "Camera: Permission Denied";
+    }
+    if (laser) laser.style.display = 'none';
     showToast("Camera access rejected or unavailable.");
   }
 }
 
-function toggleScannerCamera() {
-  if (!cameraPermissionGranted) {
-    showToast("Grant camera permission before switching streams.");
+async function startIntakeBarcodeScanner() {
+  const readerDiv = document.getElementById('reader');
+  const status = document.getElementById('camera-mode-status');
+  const toggleBtn = document.getElementById('btn-camera-toggle');
+  const laser = document.getElementById('scanner-viewport-laser');
+
+  if (!readerDiv) return;
+
+  await stopIntakeBarcodeScanner();
+
+  if (typeof Html5Qrcode === 'undefined') {
+    console.warn("Html5Qrcode library not loaded yet.");
+    if (status) {
+      status.style.display = 'block';
+      status.innerText = '⚠️ Scanner engine loading... Type SKU manually below.';
+    }
     return;
   }
 
-  const statusEl = document.getElementById('camera-mode-status');
-  if (scannerCamera === 'back') {
-    scannerCamera = 'front';
-    statusEl.innerText = "Camera: User (Front)";
-    showToast("Switched barcode scanner to User (Front) camera");
-  } else {
-    scannerCamera = 'back';
-    statusEl.innerText = "Camera: Environment (Back)";
-    showToast("Switched barcode scanner to Environment (Back) camera");
+  try {
+    const html5QrCode = new Html5Qrcode("reader");
+    html5QrcodeScanner = html5QrCode;
+
+    const config = {
+      fps: 15,
+      qrbox: { width: 250, height: 150 },
+      aspectRatio: 1.777778
+    };
+
+    if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+      config.formatsToSupport = [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.DATA_MATRIX
+      ];
+    }
+
+    const cameraConfig = { facingMode: currentCameraFacingMode };
+
+    await html5QrCode.start(
+      cameraConfig,
+      config,
+      (decodedText, decodedResult) => {
+        console.log("Barcode scanned:", decodedText);
+        onIntakeBarcodeScanned(decodedText);
+      },
+      (errorMessage) => {
+        // Continuous scan frame callback - ignore
+      }
+    );
+
+    if (toggleBtn) toggleBtn.style.display = 'inline-flex';
+    if (status) status.style.display = 'none';
+    if (laser) laser.style.display = 'block';
+
+  } catch (err) {
+    console.warn("Html5Qrcode start exception:", err);
+    if (status) {
+      status.style.display = 'block';
+      status.innerText = `Camera: ${currentCameraFacingMode === 'user' ? 'Front' : 'Back'} Camera Ready`;
+    }
   }
 }
 
-function processBarcodeScan() {
+function onIntakeBarcodeScanned(skuValue) {
+  if (!skuValue) return;
+
+  const skuInput = document.getElementById('scanner-barcode-input');
+  if (skuInput) {
+    skuInput.value = skuValue.trim().toUpperCase();
+  }
+
+  showToast(`✅ Barcode Scanned: ${skuValue}`);
+  
+  // Stop scanning after successful scan as required
+  stopIntakeBarcodeScanner();
+}
+
+async function toggleScannerCamera() {
+  currentCameraFacingMode = (currentCameraFacingMode === "environment" || currentCameraFacingMode === "back") ? "user" : "environment";
+  const status = document.getElementById('camera-mode-status');
+  if (status) {
+    status.style.display = 'block';
+    status.innerText = `Switching to ${currentCameraFacingMode === 'user' ? 'Front' : 'Back'} Camera...`;
+  }
+  showToast(`Switching camera stream to ${currentCameraFacingMode === 'user' ? 'Front' : 'Back'} camera`);
+  
+  if (cameraPermissionGranted) {
+    await startIntakeBarcodeScanner();
+  } else {
+    await requestCameraPermissionDirectly();
+  }
+}
+
+async function stopIntakeBarcodeScanner() {
+  if (html5QrcodeScanner) {
+    try {
+      if (html5QrcodeScanner.isScanning) {
+        await html5QrcodeScanner.stop();
+      }
+      html5QrcodeScanner.clear();
+    } catch (e) {
+      console.warn("Error stopping scanner:", e);
+    }
+    html5QrcodeScanner = null;
+  }
+}
+
+async function processBarcodeScan() {
   const input = document.getElementById('scanner-barcode-input');
-  const sku = input.value.trim().toUpperCase();
+  const sku = input ? input.value.trim().toUpperCase() : '';
 
   if (!sku) {
-    showToast('Please type or scan a product SKU');
+    showToast('Please scan a barcode or type a product SKU');
     return;
   }
 
   const scanRecord = {
+    id: 'SCAN-' + Date.now(),
     sku,
     timestamp: new Date().toLocaleTimeString(),
+    date: new Date().toISOString(),
+    status: 'Registered',
     mode: isOfflineMode ? 'Cached Offline' : 'Live Reconciled'
   };
 
   localCache.scans.unshift(scanRecord);
+  saveLocalCache();
   renderScanQueue();
-  showToast(`Recorded SKU ${sku}`);
-  input.value = '';
+
+  // Try backend API registration if available
+  try {
+    const res = await fetch(`${API_BASE}/api/inventory/intake`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sku, name: `Scanned Item ${sku}`, quantity: 1 })
+    });
+    if (res.ok) {
+      showToast(`Item ${sku} registered & saved to Inventory DB!`);
+    } else {
+      showToast(`Item ${sku} saved to local intake queue.`);
+    }
+  } catch (err) {
+    showToast(`Item ${sku} saved locally (Offline mode).`);
+  }
+
+  if (input) input.value = '';
+
+  // Restart scanner for next barcode scan if camera permission granted
+  if (cameraPermissionGranted) {
+    setTimeout(() => startIntakeBarcodeScanner(), 500);
+  }
 }
 
 function renderScanQueue() {
@@ -1955,7 +2155,9 @@ function switchScannerSubTab(sub) {
     document.getElementById('btn-scanner-subtab-barcode').style.background = 'var(--color-purple-primary)';
     document.getElementById('btn-scanner-subtab-barcode').style.color = 'white';
     document.getElementById('scanner-view-barcode').style.display = 'block';
+    requestCameraPermissionDirectly();
   } else {
+    stopIntakeBarcodeScanner();
     document.getElementById('btn-scanner-subtab-ocr').className = 'btn';
     document.getElementById('btn-scanner-subtab-ocr').style.background = 'var(--color-purple-primary)';
     document.getElementById('btn-scanner-subtab-ocr').style.color = 'white';
@@ -2147,331 +2349,89 @@ function resetOcrScanner() {
   document.getElementById('ocr-results-card').style.display = 'none';
 }
 
-let rawDocuments = [];
-let currentOpenedDoc = null;
-
-async function loadInvoiceLedger() {
-  const container = document.getElementById('invoice-ledger-list');
-  if (!container) return;
-  container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 1rem;">Loading documents...</div>';
-
-  try {
-    const [invRes, recRes] = await Promise.all([
-      authFetch('/api/invoices'),
-      authFetch('/api/receipts')
-    ]);
-
-    let invoices = invRes.ok ? await invRes.json() : [];
-    let receipts = recRes.ok ? await recRes.json() : [];
-
-    invoices = invoices.map(i => ({ ...i, type: i.type || 'invoice', payment_status: i.payment_status || 'Pending' }));
-    receipts = receipts.map(r => ({ ...r, type: r.type || 'receipt', payment_status: r.payment_status || 'Paid' }));
-
-    rawDocuments = [...invoices, ...receipts].sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
-
-    filterInvoiceLedger();
-  } catch (err) {
-    console.error("Ledger load error", err);
-    container.innerHTML = `<div style="color: var(--state-crimson); padding: 1rem;">Error loading ledger.</div>`;
-  }
-}
-
-function filterInvoiceLedger() {
-  const container = document.getElementById('invoice-ledger-list');
-  if (!container) return;
-
-  const query = (document.getElementById('invoice-search-input')?.value || '').toLowerCase().trim();
-  const typeFilter = document.getElementById('invoice-filter-type')?.value || 'all';
-  const statusFilter = document.getElementById('invoice-filter-status')?.value || 'all';
-  const startDate = document.getElementById('invoice-filter-start-date')?.value;
-  const endDate = document.getElementById('invoice-filter-end-date')?.value;
-
-  let filtered = [...rawDocuments];
-
-  if (query) {
-    filtered = filtered.filter(doc => {
-      const custMatch = (doc.customer_name || '').toLowerCase().includes(query);
-      const supplierMatch = (doc.supplier_name || '').toLowerCase().includes(query);
-      const invNoMatch = (doc.invoice_number || doc.id || '').toLowerCase().includes(query);
-      const recNoMatch = (doc.receipt_number || doc.id || '').toLowerCase().includes(query);
-      const prodMatch = (doc.items || []).some(item => (item.name || '').toLowerCase().includes(query) || (item.sku || '').toLowerCase().includes(query));
-      return custMatch || supplierMatch || invNoMatch || recNoMatch || prodMatch;
-    });
-  }
-
-  if (typeFilter !== 'all') {
-    filtered = filtered.filter(doc => doc.type === typeFilter);
-  }
-
-  if (statusFilter !== 'all') {
-    filtered = filtered.filter(doc => (doc.payment_status || 'Pending') === statusFilter);
-  }
-
-  if (startDate) {
-    filtered = filtered.filter(doc => new Date(doc.date || doc.created_at) >= new Date(startDate));
-  }
-
-  if (endDate) {
-    const end = new Date(endDate);
-    end.setDate(end.getDate() + 1);
-    filtered = filtered.filter(doc => new Date(doc.date || doc.created_at) <= end);
-  }
-
-  renderInvoiceLedgerList(filtered);
-}
-
-function resetInvoiceFilters() {
-  if (document.getElementById('invoice-search-input')) document.getElementById('invoice-search-input').value = '';
-  if (document.getElementById('invoice-filter-type')) document.getElementById('invoice-filter-type').value = 'all';
-  if (document.getElementById('invoice-filter-status')) document.getElementById('invoice-filter-status').value = 'all';
-  if (document.getElementById('invoice-filter-start-date')) document.getElementById('invoice-filter-start-date').value = '';
-  if (document.getElementById('invoice-filter-end-date')) document.getElementById('invoice-filter-end-date').value = '';
-  filterInvoiceLedger();
-}
-
-function renderInvoiceLedgerList(documents) {
+async function loadInvoiceLedger(invoicesData) {
   const container = document.getElementById('invoice-ledger-list');
   if (!container) return;
   container.innerHTML = '';
 
-  if (documents.length === 0) {
-    container.innerHTML = `<div style="text-align: center; color: var(--text-dim); padding: 1.5rem;">No matching receipts or invoices found.</div>`;
-    return;
-  }
-
-  documents.forEach(doc => {
-    const card = document.createElement('div');
-    card.className = 'card-item';
-    card.style.flexDirection = 'column';
-    card.style.gap = '0.5rem';
-    card.style.border = '1px solid var(--border-color)';
-    card.style.background = 'rgba(255, 255, 255, 0.02)';
-    card.style.borderRadius = 'var(--radius)';
-    card.style.padding = '0.75rem';
-
-    const formattedDate = new Date(doc.date || doc.created_at).toLocaleDateString();
-
-    let badgeBg = 'var(--color-purple-primary)';
-    let badgeColor = '#fff';
-    const status = doc.payment_status || 'Pending';
-
-    if (status === 'Paid') {
-      badgeBg = '#10B981';
-    } else if (status === 'Pending') {
-      badgeBg = '#F59E0B';
-    } else if (status === 'Declined') {
-      badgeBg = '#EF4444';
-    } else if (status === 'Rejected') {
-      badgeBg = '#991B1B';
+  try {
+    // If invoicesData is provided (e.g., from a search), use it; otherwise fetch all invoices
+    let invoices;
+    if (invoicesData) {
+      invoices = invoicesData;
+    } else {
+      const res = await authFetch('/api/invoices');
+      if (!res.ok) return;
+      invoices = await res.json();
+    }
+    if (invoices.length === 0) {
+      container.innerHTML = `<div style="text-align: center; color: var(--text-dim); padding: 1rem;">No documented invoices yet.</div>`;
+      return;
     }
 
-    const typeLabel = (doc.type || 'invoice').toUpperCase();
-    const docNo = doc.invoice_number || doc.receipt_number || doc.id;
+    invoices.forEach(inv => {
+      const card = document.createElement('div');
+      card.className = 'card-item';
+      card.style.flexDirection = 'column';
+      card.style.gap = '0.5rem';
+      card.style.border = '1px solid var(--border-color)';
+      card.style.background = 'rgba(255, 255, 255, 0.02)';
+      
+      const formattedDate = new Date(inv.date).toLocaleDateString();
 
-    card.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <span style="font-weight: 700; color: var(--color-purple-primary); font-size: 0.9rem;">[${typeLabel}] ${docNo}</span>
-          <div style="font-size: 0.75rem; color: var(--text-muted);">Customer / Vendor: <strong>${doc.customer_name || doc.supplier_name}</strong></div>
+      card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; font-weight: 700; color: var(--color-purple-primary);">
+          <span>ID: ${inv.id}</span>
+          <span>$${inv.total_amount.toFixed(2)}</span>
         </div>
-        <div style="text-align: right;">
-          <span style="font-weight: 700; font-size: 0.95rem; color: var(--color-gold);">$${(Number(doc.total_amount) || 0).toFixed(2)}</span>
-          <div style="margin-top: 0.25rem;">
-            <select class="form-control" style="font-size: 0.68rem; padding: 0.15rem 0.4rem; background: ${badgeBg}; color: ${badgeColor}; border: none; font-weight: 700; border-radius: 4px; cursor: pointer;" onchange="updateDocumentPaymentStatus('${doc.id}', this.value)">
-              <option value="Paid" ${status === 'Paid' ? 'selected' : ''}>Paid</option>
-              <option value="Pending" ${status === 'Pending' ? 'selected' : ''}>Pending</option>
-              <option value="Declined" ${status === 'Declined' ? 'selected' : ''}>Declined</option>
-              <option value="Rejected" ${status === 'Rejected' ? 'selected' : ''}>Rejected</option>
-            </select>
-          </div>
+        <div style="font-size: 0.75rem; color: var(--text-dark); display: flex; justify-content: space-between;">
+          <span>Vendor: ${inv.supplier_name}</span>
+          <span>Date: ${formattedDate}</span>
         </div>
-      </div>
-      <div style="font-size: 0.75rem; color: var(--text-dark); display: flex; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 0.4rem; margin-top: 0.2rem;">
-        <span>Branch: ${doc.branch_name || 'Main Warehouse'}</span>
-        <span>Date: ${formattedDate}</span>
-      </div>
-      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; color: var(--text-muted);">
-        <span>Line Items: ${doc.items ? doc.items.length : 0} items</span>
-        <div style="display: flex; gap: 0.3rem;">
-          <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.65rem;" onclick="openDocumentViewer('${doc.id}')">View Details</button>
-          <button class="btn btn-gold" style="padding: 0.2rem 0.5rem; font-size: 0.65rem;" onclick="reopenDocument('${doc.id}')">Re-Open</button>
+        <div style="font-size: 0.7rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border-color); padding-top: 0.4rem; margin-top: 0.2rem;">
+          <span>Target: ${inv.branch_name} (${inv.items.length} items)</span>
+          <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.65rem;" onclick="toggleInvoiceItems(this, '${inv.id}')">
+            View Details
+          </button>
         </div>
-      </div>
-    `;
-
-    container.appendChild(card);
-  });
-}
-
-async function updateDocumentPaymentStatus(docId, newStatus) {
-  try {
-    const res = await authFetch('/api/invoices/status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: docId, payment_status: newStatus })
+        <div class="invoice-items-preview" id="preview-${inv.id}" style="display: none; background: rgba(92, 27, 117, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 0.5rem; margin-top: 0.25rem;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.65rem;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border-color);">
+                <th style="text-align: left;">Product</th>
+                <th style="text-align: center; width: 15%;">Qty</th>
+                <th style="text-align: right; width: 25%;">Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${inv.items.map(it => `
+                <tr style="border-bottom: 1px solid rgba(0,0,0,0.02);">
+                  <td>${it.name} (${it.sku})</td>
+                  <td style="text-align: center;">${it.qty}</td>
+                  <td style="text-align: right;">$${(it.qty * it.price).toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      container.appendChild(card);
     });
 
-    if (res.ok) {
-      showToast(`Payment status updated to ${newStatus}`);
-      const target = rawDocuments.find(d => d.id === docId);
-      if (target) target.payment_status = newStatus;
-      filterInvoiceLedger();
-    } else {
-      const data = await res.json();
-      showToast(`Failed to update status: ${data.error}`);
-    }
   } catch (err) {
-    showToast(`Error: ${err.message}`);
+    console.error("Ledger load error", err);
   }
 }
 
-function openDocumentViewer(docId) {
-  const doc = rawDocuments.find(d => d.id === docId);
-  if (!doc) return;
-
-  currentOpenedDoc = doc;
-  const modal = document.getElementById('document-viewer-modal');
-  const title = document.getElementById('doc-modal-title');
-  const body = document.getElementById('doc-modal-body');
-
-  title.innerText = `${(doc.type || 'Document').toUpperCase()}: ${doc.invoice_number || doc.receipt_number || doc.id}`;
-
-  const formattedDate = new Date(doc.date || doc.created_at).toLocaleString();
-
-  let itemsHtml = '';
-  if (doc.items && doc.items.length > 0) {
-    itemsHtml = `
-      <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-top: 0.5rem;">
-        <thead>
-          <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted);">
-            <th style="text-align: left; padding: 0.3rem;">Item</th>
-            <th style="text-align: center; padding: 0.3rem;">Qty</th>
-            <th style="text-align: right; padding: 0.3rem;">Price</th>
-            <th style="text-align: right; padding: 0.3rem;">Subtotal</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${doc.items.map(it => `
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-              <td style="padding: 0.3rem;">${it.name} <br><small style="color:var(--text-muted);">${it.sku}</small></td>
-              <td style="text-align: center; padding: 0.3rem;">${it.qty}</td>
-              <td style="text-align: right; padding: 0.3rem;">$${(Number(it.price)||0).toFixed(2)}</td>
-              <td style="text-align: right; padding: 0.3rem;">$${(Number(it.subtotal)||(it.qty * it.price)||0).toFixed(2)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
+function toggleInvoiceItems(btn, invId) {
+  const p = document.getElementById(`preview-${invId}`);
+  if (p.style.display === 'none') {
+    p.style.display = 'block';
+    btn.innerText = 'Hide Details';
   } else {
-    itemsHtml = '<div style="color: var(--text-muted);">No items documented.</div>';
-  }
-
-  body.innerHTML = `
-    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
-      <div>
-        <div>Customer / Client: <strong>${doc.customer_name || 'N/A'}</strong></div>
-        <div>Vendor / Supplier: <strong>${doc.supplier_name || 'N/A'}</strong></div>
-        <div>Branch / Warehouse: <strong>${doc.branch_name || 'Main Warehouse'}</strong></div>
-      </div>
-      <div style="text-align: right;">
-        <div>Status: <strong style="color: var(--color-gold);">${doc.payment_status || 'Pending'}</strong></div>
-        <div>Date: <span>${formattedDate}</span></div>
-        <div>Type: <span>${(doc.type || 'Invoice').toUpperCase()}</span></div>
-      </div>
-    </div>
-    <div>
-      <div style="font-weight: 700; margin-bottom: 0.25rem;">Items Summary:</div>
-      ${itemsHtml}
-    </div>
-    <div style="display: flex; justify-content: space-between; font-size: 1rem; font-weight: 700; border-top: 1px solid var(--border-color); padding-top: 0.5rem; margin-top: 0.5rem;">
-      <span>Total Amount:</span>
-      <span style="color: var(--color-gold);">$${(Number(doc.total_amount)||0).toFixed(2)}</span>
-    </div>
-  `;
-
-  if (modal) modal.style.display = 'flex';
-}
-
-function closeDocumentViewer() {
-  const modal = document.getElementById('document-viewer-modal');
-  if (modal) modal.style.display = 'none';
-}
-
-function reopenDocument(docId) {
-  openDocumentViewer(docId);
-  showToast(`Re-opened document ${docId}`);
-}
-
-function reprintCurrentDocument() {
-  if (!currentOpenedDoc) return;
-  const printWindow = window.open('', '_blank');
-  printWindow.document.write(`
-    <html>
-      <head>
-        <title>Receipt/Invoice Print - ${currentOpenedDoc.id}</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; color: #000; }
-          h2 { color: #5c1b75; }
-          table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-          th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-          th { background: #f2f2f2; }
-          .total { font-weight: bold; font-size: 1.1em; text-align: right; margin-top: 15px; }
-        </style>
-      </head>
-      <body>
-        <h2>SmartStock Document - ${(currentOpenedDoc.type || 'Invoice').toUpperCase()}</h2>
-        <p><strong>Document ID:</strong> ${currentOpenedDoc.id}</p>
-        <p><strong>Customer:</strong> ${currentOpenedDoc.customer_name || 'N/A'}</p>
-        <p><strong>Date:</strong> ${new Date(currentOpenedDoc.date || currentOpenedDoc.created_at).toLocaleDateString()}</p>
-        <p><strong>Payment Status:</strong> ${currentOpenedDoc.payment_status || 'Pending'}</p>
-        <hr>
-        <table>
-          <thead>
-            <tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr>
-          </thead>
-          <tbody>
-            ${(currentOpenedDoc.items || []).map(i => `
-              <tr>
-                <td>${i.name} (${i.sku})</td>
-                <td>${i.qty}</td>
-                <td>$${Number(i.price).toFixed(2)}</td>
-                <td>$${(Number(i.subtotal)||(i.qty*i.price)).toFixed(2)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-        <div class="total">Total: $${(Number(currentOpenedDoc.total_amount)||0).toFixed(2)}</div>
-        <script>window.print();</script>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
-}
-
-function downloadCurrentDocumentPdf() {
-  if (!currentOpenedDoc) return;
-  const content = `SmartStock ${(currentOpenedDoc.type||'Document').toUpperCase()}\nID: ${currentOpenedDoc.id}\nCustomer: ${currentOpenedDoc.customer_name||'N/A'}\nDate: ${currentOpenedDoc.date}\nPayment Status: ${currentOpenedDoc.payment_status}\nTotal: $${currentOpenedDoc.total_amount}`;
-  const blob = new Blob([content], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${currentOpenedDoc.id}.txt`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  showToast(`Downloaded document ${currentOpenedDoc.id}`);
-}
-
-function shareCurrentDocument() {
-  if (!currentOpenedDoc) return;
-  const text = `SmartStock ${currentOpenedDoc.type || 'Document'} #${currentOpenedDoc.id} for ${currentOpenedDoc.customer_name || 'Customer'}. Total: $${currentOpenedDoc.total_amount}. Status: ${currentOpenedDoc.payment_status}`;
-  if (navigator.share) {
-    navigator.share({ title: `Document ${currentOpenedDoc.id}`, text: text, url: window.location.href });
-  } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(text);
-    showToast("Document details copied to clipboard!");
-  } else {
-    showToast("Sharing not supported on this device.");
+    p.style.display = 'none';
+    btn.innerText = 'View Details';
   }
 }
 
@@ -3356,119 +3316,6 @@ function toggleVoiceAssistantListening() {
 
 function processVoiceCommand(command) {
   const normalized = command.toLowerCase().trim();
-
-  // 1. Multi-turn Conversational Item Registration Flow
-  if (voiceDialogState && voiceDialogState.type === 'item_registration') {
-    const fields = [
-      { key: 'name', prompt: 'What is the item name?', label: 'Item Name' },
-      { key: 'category', prompt: 'What category does it belong to?', label: 'Category' },
-      { key: 'brand', prompt: 'What is the brand?', label: 'Brand' },
-      { key: 'quantity', prompt: 'What quantity?', label: 'Quantity' },
-      { key: 'unit', prompt: 'What is the unit? e.g. bottles, packs, units', label: 'Unit' },
-      { key: 'purchase_price', prompt: 'What is the purchase price?', label: 'Purchase Price' },
-      { key: 'selling_price', prompt: 'What is the selling price?', label: 'Selling Price' },
-      { key: 'batch_number', prompt: 'What is the batch number?', label: 'Batch Number' },
-      { key: 'barcode', prompt: 'What is the barcode?', label: 'Barcode' },
-      { key: 'sku', prompt: 'What is the SKU?', label: 'SKU' },
-      { key: 'supplier', prompt: 'Who is the supplier?', label: 'Supplier' },
-      { key: 'warehouse', prompt: 'Which warehouse or location?', label: 'Warehouse/Location' },
-      { key: 'mfg_date', prompt: 'What is the manufacturing date?', label: 'Manufacturing Date' },
-      { key: 'expiry_date', prompt: 'What is the expiry date?', label: 'Expiry Date' },
-      { key: 'tax', prompt: 'What is the tax rate?', label: 'Tax' },
-      { key: 'min_stock', prompt: 'What is the minimum stock level?', label: 'Minimum Stock' },
-      { key: 'max_stock', prompt: 'What is the maximum stock level?', label: 'Maximum Stock' },
-      { key: 'notes', prompt: 'Any notes for this item?', label: 'Notes' }
-    ];
-
-    const currentFieldIndex = voiceDialogState.step;
-    const currentField = fields[currentFieldIndex];
-
-    voiceDialogState.data[currentField.key] = command.trim();
-    voiceDialogState.step++;
-
-    if (voiceDialogState.step < fields.length) {
-      const nextField = fields[voiceDialogState.step];
-      const question = nextField.prompt;
-      speakText(question);
-      displaySpeechSubtitle(question, true);
-      addVoiceCommandHistory(command, `Item Reg: ${currentField.label} = "${command.trim()}"`);
-      return;
-    } else {
-      const d = voiceDialogState.data;
-      const summary = `Item Registration Summary: Name: ${d.name}, Qty: ${d.quantity} ${d.unit}, Category: ${d.category}, Price: $${d.selling_price}, Batch: ${d.batch_number}. Should I save this item to inventory? Say Confirm to save or Cancel to discard.`;
-      
-      voiceDialogState = {
-        type: 'confirm_item_registration',
-        data: d
-      };
-
-      speakText(summary);
-      displaySpeechSubtitle(summary, true);
-      addVoiceCommandHistory(command, `Item Registration Form Completed. Awaiting confirmation.`);
-      return;
-    }
-  }
-
-  if (voiceDialogState && voiceDialogState.type === 'confirm_item_registration') {
-    if (normalized.includes('confirm') || normalized.includes('yes') || normalized.includes('save') || normalized.includes('submit')) {
-      const d = voiceDialogState.data;
-      const sku = (d.sku && d.sku !== 'none' && d.sku !== 'skip') ? d.sku.toUpperCase() : `SKU-${Date.now().toString().slice(-4)}`;
-      const newProductObj = {
-        sku,
-        name: d.name,
-        category: d.category || "General Retail",
-        volume_per_unit: 0.001,
-        cost: parseFloat(d.purchase_price || "0"),
-        price: parseFloat(d.selling_price || "0"),
-        safety_stock: parseInt(d.min_stock || "10"),
-        min_reorder_level: parseInt(d.min_stock || "20"),
-        lead_time: 5,
-        supplier_name: d.supplier || "General Supplier",
-        branches: [
-          { branch: d.warehouse || "Main Warehouse", quantity: parseInt(d.quantity || "0") }
-        ]
-      };
-
-      rawCatalog.push(newProductObj);
-      setupRequestSkuSelect();
-
-      authFetch('/api/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sku,
-          name: d.name,
-          category: d.category || "General Retail",
-          volume_per_unit: 0.001,
-          cost: parseFloat(d.purchase_price || "0"),
-          price: parseFloat(d.selling_price || "0"),
-          safety_stock: parseInt(d.min_stock || "10"),
-          min_reorder_level: parseInt(d.min_stock || "20"),
-          lead_time: 5,
-          supplier_name: d.supplier || "General Supplier",
-          main_qty: parseInt(d.quantity || "0"),
-          north_qty: 0,
-          south_qty: 0
-        })
-      }).catch(e => console.error("Voice product creation sync error", e));
-
-      switchTab('catalog');
-      switchSubTab('inventory');
-      loadCatalog();
-
-      speakText(`Item ${d.name} registered successfully and saved to inventory.`);
-      displaySpeechSubtitle(`Saved item: ${d.name}`);
-      addVoiceCommandHistory(command, `Saved registered item ${d.name}`);
-      voiceDialogState = null;
-      return;
-    } else if (normalized.includes('cancel') || normalized.includes('no') || normalized.includes('discard')) {
-      speakText("Item registration cancelled.");
-      displaySpeechSubtitle("Item registration discarded.");
-      addVoiceCommandHistory(command, "Cancelled Item Registration Dialog");
-      voiceDialogState = null;
-      return;
-    }
-  }
   
   if (voiceDialogState && voiceDialogState.type === 'confirm_expiry') {
     if (normalized.includes('confirm') || normalized.includes('yes') || normalized.includes('save') || normalized.includes('submit')) {
@@ -3491,137 +3338,6 @@ function processVoiceCommand(command) {
   }
 
   const isStaff = currentUser && currentUser.role === 'Staff';
-
-  // 2. Trigger Conversational Registration Flow
-  if (normalized.includes('register a new item') || normalized.includes('register item') || normalized.includes('register stock') || normalized.includes('add a new item')) {
-    switchTab('catalog');
-    switchSubTab('inventory');
-    voiceDialogState = {
-      type: 'item_registration',
-      step: 0,
-      data: {}
-    };
-    const question = "Starting item registration. What is the item name?";
-    speakText(question);
-    displaySpeechSubtitle(question, true);
-    addVoiceCommandHistory(command, "Started Natural AI Item Registration Workflow");
-    return;
-  }
-
-  // 3. AI Voice Navigation Commands
-  if (normalized.includes('create an invoice') || normalized.includes('create invoice')) {
-    switchTab('scanner');
-    switchScannerSubTab('ocr');
-    speakText("Opening invoice creation and goods receiving scanner.");
-    addVoiceCommandHistory(command, "Navigated to Create Invoice");
-    return;
-  }
-
-  if (normalized.includes('create a receipt') || normalized.includes('create receipt')) {
-    switchTab('more');
-    setTimeout(() => {
-      const card = document.getElementById('more-invoices-card');
-      if (card) card.scrollIntoView({ behavior: 'smooth' });
-    }, 300);
-    speakText("Opening receipt documentation history.");
-    addVoiceCommandHistory(command, "Navigated to Create Receipt");
-    return;
-  }
-
-  if (normalized.includes('register a supplier') || normalized.includes('register supplier')) {
-    switchTab('more');
-    setTimeout(() => {
-      const card = document.getElementById('more-reorders-card');
-      if (card) card.scrollIntoView({ behavior: 'smooth' });
-    }, 300);
-    speakText("Opening supplier registration portal.");
-    addVoiceCommandHistory(command, "Navigated to Register Supplier");
-    return;
-  }
-
-  if (normalized.includes('register a customer') || normalized.includes('register customer')) {
-    switchTab('requests');
-    switchReqModule('customer');
-    toggleManualRequestForm();
-    speakText("Opening customer registration form.");
-    addVoiceCommandHistory(command, "Navigated to Register Customer");
-    return;
-  }
-
-  if (normalized.includes('search receipts')) {
-    switchTab('more');
-    setTimeout(() => {
-      const card = document.getElementById('more-invoices-card');
-      if (card) card.scrollIntoView({ behavior: 'smooth' });
-      const typeSel = document.getElementById('invoice-filter-type');
-      if (typeSel) {
-        typeSel.value = 'receipt';
-        filterInvoiceLedger();
-      }
-    }, 300);
-    speakText("Showing receipts history.");
-    addVoiceCommandHistory(command, "Filtered Receipts History");
-    return;
-  }
-
-  if (normalized.includes('search invoices')) {
-    switchTab('more');
-    setTimeout(() => {
-      const card = document.getElementById('more-invoices-card');
-      if (card) card.scrollIntoView({ behavior: 'smooth' });
-      const typeSel = document.getElementById('invoice-filter-type');
-      if (typeSel) {
-        typeSel.value = 'invoice';
-        filterInvoiceLedger();
-      }
-    }, 300);
-    speakText("Showing invoices history.");
-    addVoiceCommandHistory(command, "Filtered Invoices History");
-    return;
-  }
-
-  if (normalized.includes('show pending invoices') || normalized.includes('show pending')) {
-    switchTab('more');
-    setTimeout(() => {
-      const card = document.getElementById('more-invoices-card');
-      if (card) card.scrollIntoView({ behavior: 'smooth' });
-      const statusSel = document.getElementById('invoice-filter-status');
-      if (statusSel) {
-        statusSel.value = 'Pending';
-        filterInvoiceLedger();
-      }
-    }, 300);
-    speakText("Showing pending invoices.");
-    addVoiceCommandHistory(command, "Filtered Pending Invoices");
-    return;
-  }
-
-  if (normalized.includes('show paid invoices') || normalized.includes('show paid')) {
-    switchTab('more');
-    setTimeout(() => {
-      const card = document.getElementById('more-invoices-card');
-      if (card) card.scrollIntoView({ behavior: 'smooth' });
-      const statusSel = document.getElementById('invoice-filter-status');
-      if (statusSel) {
-        statusSel.value = 'Paid';
-        filterInvoiceLedger();
-      }
-    }, 300);
-    speakText("Showing paid invoices.");
-    addVoiceCommandHistory(command, "Filtered Paid Invoices");
-    return;
-  }
-
-  if (normalized.includes('open settings') || normalized.includes('show settings')) {
-    switchTab('more');
-    setTimeout(() => {
-      const settingsSection = document.getElementById('voice-settings-accordion');
-      if (settingsSection) settingsSection.scrollIntoView({ behavior: 'smooth' });
-    }, 300);
-    speakText("Settings panel opened.");
-    addVoiceCommandHistory(command, "Opened Settings Panel");
-    return;
-  }
 
   if (normalized.includes('go to dashboard') || normalized.includes('open dashboard') || normalized.includes('show dashboard')) {
     switchTab('dashboard');

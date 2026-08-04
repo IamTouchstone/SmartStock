@@ -14,6 +14,7 @@
   <meta name="apple-mobile-web-app-title" content="SmartStock">
   <meta name="description" content="AI-powered inventory management system for smart businesses">
   <link rel="stylesheet" href="style.css">
+  <script src="html5-qrcode.min.js"></script>
 </head>
 <script>
   if ('serviceWorker' in navigator) {
@@ -468,13 +469,14 @@
               </button>
             </div>
 
-            <div class="scanner-viewport">
-              <div class="scan-laser" id="scanner-viewport-laser" style="display: none;"></div>
-              <div style="color: var(--text-dim); font-size: 0.75rem; font-weight: 600;" id="camera-mode-status">
+            <div class="scanner-viewport" style="position: relative; min-height: 250px; overflow: hidden; background: #000; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; border: 1px solid var(--color-gold);">
+              <div id="reader" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1;"></div>
+              <div class="scan-laser" id="scanner-viewport-laser" style="display: none; z-index: 5;"></div>
+              <div style="color: #bbb; font-size: 0.8rem; font-weight: 600; z-index: 2; position: relative; text-align: center; padding: 1rem;" id="camera-mode-status">
                 Camera: Locked
               </div>
-              <button class="btn btn-secondary" id="btn-camera-toggle" style="position: absolute; bottom: 10px; padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: var(--color-gold); display: none;" onclick="toggleScannerCamera()">
-                Switch Camera
+              <button class="btn btn-secondary" id="btn-camera-toggle" style="position: absolute; bottom: 12px; right: 12px; z-index: 10; padding: 0.35rem 0.65rem; font-size: 0.75rem; border-color: var(--color-gold); background: rgba(0,0,0,0.75); color: #fff; display: inline-flex; align-items: center; gap: 0.3rem;" onclick="toggleScannerCamera()">
+                📷 Switch Camera
               </button>
             </div>
 
@@ -482,8 +484,8 @@
               <div class="form-group">
                 <label>Scan / Type Product SKU</label>
                 <div style="display: flex; gap: 0.5rem;">
-                  <input type="text" id="scanner-barcode-input" class="form-control" placeholder="Enter SKU (e.g. TS-100)">
-                  <button class="btn btn-gold" onclick="processBarcodeScan()">Intake</button>
+                  <input type="text" id="scanner-barcode-input" class="form-control" placeholder="Enter SKU (e.g. EAN-13, UPC, TS-100)">
+                  <button class="btn btn-gold" onclick="processBarcodeScan()" style="white-space: nowrap;">Add/Register Item</button>
                 </div>
               </div>
             </div>
@@ -892,41 +894,34 @@
 
         <!-- Invoices & Receipts Ledger Card -->
         <div class="card" id="more-invoices-card">
-          <div class="section-header" style="margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
-            <div class="section-title" style="font-size: 1rem; color: var(--color-purple-primary); font-weight: 700;">Receipt & Invoice History</div>
-            <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;" onclick="loadInvoiceLedger()">🔄 Refresh</button>
+          <div class="section-header" style="margin-bottom: 0.75rem;">
+            <div class="section-title" style="font-size: 0.95rem;">Invoice & Receipt Ledger</div>
           </div>
-          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-            Searchable historical archive for receipts and invoices.
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+            Historically documented purchase receipts and invoices:
           </div>
-
-          <!-- Search & Filter Controls -->
-          <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem;">
-            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-              <input type="text" id="invoice-search-input" class="form-control" placeholder="Search by customer, receipt #, invoice #, or product name..." style="flex: 2; min-width: 200px; font-size: 0.8rem;" oninput="filterInvoiceLedger()">
-              <select id="invoice-filter-type" class="form-control" style="flex: 1; min-width: 110px; font-size: 0.8rem;" onchange="filterInvoiceLedger()">
-                <option value="all">All Types</option>
-                <option value="invoice">Invoices</option>
-                <option value="receipt">Receipts</option>
-              </select>
-              <select id="invoice-filter-status" class="form-control" style="flex: 1; min-width: 120px; font-size: 0.8rem;" onchange="filterInvoiceLedger()">
-                <option value="all">All Statuses</option>
-                <option value="Paid">Paid</option>
-                <option value="Pending">Pending</option>
-                <option value="Declined">Declined</option>
-                <option value="Rejected">Rejected</option>
-              </select>
-            </div>
-            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; font-size: 0.75rem;">
-              <label style="color: var(--text-muted);">From:</label>
-              <input type="date" id="invoice-filter-start-date" class="form-control" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; width: auto;" onchange="filterInvoiceLedger()">
-              <label style="color: var(--text-muted);">To:</label>
-              <input type="date" id="invoice-filter-end-date" class="form-control" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; width: auto;" onchange="filterInvoiceLedger()">
-              <button class="btn btn-secondary" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;" onclick="resetInvoiceFilters()">Clear Filters</button>
-            </div>
-          </div>
-
-          <div id="invoice-ledger-list" style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.75rem; max-height: 450px; overflow-y: auto;">
+<div class="card" id="invoice-search-card" style="margin-bottom: 0.75rem;">
+  <div class="section-header" style="margin-bottom: 0.5rem;">
+    <div class="section-title" style="font-size: 0.9rem;">Search Invoices & Receipts</div>
+  </div>
+  <form id="invoice-search-form" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+    <input type="text" id="search-customer" class="form-control" placeholder="Customer Name" style="flex:1 1 150px;"/>
+    <input type="text" id="search-receipt" class="form-control" placeholder="Receipt #" style="flex:1 1 120px;"/>
+    <input type="text" id="search-invoice" class="form-control" placeholder="Invoice #" style="flex:1 1 120px;"/>
+    <input type="text" id="search-product" class="form-control" placeholder="Product Name" style="flex:1 1 150px;"/>
+    <input type="date" id="search-date" class="form-control" placeholder="Date" style="flex:1 1 150px;"/>
+    <input type="date" id="search-start-date" class="form-control" placeholder="Start Date" style="flex:1 1 150px;"/>
+    <input type="date" id="search-end-date" class="form-control" placeholder="End Date" style="flex:1 1 150px;"/>
+    <select id="search-status" class="form-control" style="flex:1 1 120px;">
+      <option value="">All Statuses</option>
+      <option>Pending</option>
+      <option>Paid</option>
+      <option>Overdue</option>
+    </select>
+    <button type="submit" class="btn btn-primary" style="flex:0 0 auto;">Search</button>
+  </form>
+</div>
+          <div id="invoice-ledger-list" style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.75rem; max-height: 250px; overflow-y: auto;">
             <!-- Loaded dynamically -->
           </div>
         </div>
@@ -1270,26 +1265,7 @@
       </div>
     </div>
 
-    <!-- H. RECEIPT & INVOICE DOCUMENT VIEWER MODAL -->
-    <div id="document-viewer-modal" class="modal-overlay" style="display: none;">
-      <div class="modal-content" style="max-width: 600px; width: 92%; padding: 1.5rem; background: var(--bg-card); color: var(--text-main); border-radius: var(--radius-lg); border: 1px solid var(--border-color);">
-        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">
-          <h3 id="doc-modal-title" style="color: var(--color-purple-primary); margin: 0; font-size: 1.1rem; font-weight: 700;">Document Details</h3>
-          <button class="modal-close-btn" onclick="closeDocumentViewer()" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">&times;</button>
-        </div>
-        <div id="doc-modal-body" style="font-size: 0.85rem; display: flex; flex-direction: column; gap: 0.75rem; max-height: 60vh; overflow-y: auto;">
-          <!-- Content rendered dynamically -->
-        </div>
-        <div class="modal-footer" style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; flex-wrap: wrap;">
-          <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="reprintCurrentDocument()">🖨️ Reprint</button>
-          <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="downloadCurrentDocumentPdf()">📥 Download PDF</button>
-          <button class="btn btn-gold" style="font-size: 0.8rem;" onclick="shareCurrentDocument()">🔗 Share</button>
-          <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="closeDocumentViewer()">Close</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- I. FLOATING AI VOICE ASSISTANT -->
+    <!-- H. FLOATING AI VOICE ASSISTANT -->
     <div id="ai-voice-assistant-container">
       <div id="ai-speech-bubble" style="display: none;">
         <div class="speech-loading-dots" id="speech-loading" style="display: none;">

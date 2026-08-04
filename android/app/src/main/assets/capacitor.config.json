@@ -1,8 +1,9 @@
 {
-	"appId": "com.smartstock.app",
+	"appId": "com.iamtouchstone.smartstock",
 	"appName": "SmartStock",
 	"webDir": "public",
 	"server": {
+		"url": "https://smart-stock-seven.vercel.app",
 		"androidScheme": "https",
 		"allowNavigation": [
 			"smart-stock-seven.vercel.app"

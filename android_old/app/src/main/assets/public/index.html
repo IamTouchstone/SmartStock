@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SmartStock Inventory Core — Mobile App</title>
+  <link rel="icon" type="image/svg+xml" href="/logo_icon.svg">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#d4af37">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SmartStock">
+  <meta name="description" content="AI-powered inventory management system for smart businesses">
+  <link rel="stylesheet" href="style.css">
+</head>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
+</script>
+<body>
+
+  <!-- Simulated Mobile Viewport Frame -->
+  <div id="mobile-frame">
+
+    <!-- A. ANIMATED SPLASH SCREEN -->
+    <div class="overlay-screen" id="splash-screen">
+      <div class="splash-logo" style="text-align: center;">
+        <img src="/logo_primary.svg" alt="SmartStock" style="height: 110px; width: auto; margin-bottom: 0.5rem; filter: drop-shadow(0 4px 12px rgba(212,175,55,0.2));">
+      </div>
+    </div>
+
+    <!-- B. CAROUSEL WALKTHROUGH SCREEN -->
+    <div class="overlay-screen" id="walkthrough-screen">
+      <!-- Slide 1: AI Velocity -->
+      <div class="walkthrough-slide active" id="slide-1">
+        <div class="walkthrough-graphic">
+          <svg viewBox="0 0 24 24" width="60" height="60" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+            <polyline points="16 7 22 7 22 13"></polyline>
+          </svg>
+        </div>
+        <h3>AI Sales Velocity</h3>
+        <p>Real-time analytics engine detects rapid sales spikes and velocity trends to flag fast-moving inventory instantly.</p>
+      </div>
+
+      <!-- Slide 2: Smart Transfers -->
+      <div class="walkthrough-slide" id="slide-2">
+        <div class="walkthrough-graphic">
+          <svg viewBox="0 0 24 24" width="60" height="60" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="17 1 21 5 17 9"></polyline>
+            <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+            <polyline points="7 23 3 19 7 15"></polyline>
+            <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+          </svg>
+        </div>
+        <h3>Redistribution Savings</h3>
+        <p>Avoid expensive restocks by transferring surplus inventory from slow branches to high-velocity sales outlets.</p>
+      </div>
+
+      <!-- Slide 3: Customer Portal -->
+      <div class="walkthrough-slide" id="slide-3">
+        <div class="walkthrough-graphic">
+          <svg viewBox="0 0 24 24" width="60" height="60" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+        </div>
+        <h3>Customer Request Hub</h3>
+        <p>Staff logs and uploads custom holds, order reserves, or product availability requests for immediate admin check.</p>
+      </div>
+
+      <!-- Onboarding Navigation Footer -->
+      <div class="walkthrough-dots">
+        <div class="dot active" id="dot-1"></div>
+        <div class="dot" id="dot-2"></div>
+        <div class="dot" id="dot-3"></div>
+      </div>
+      <button class="btn btn-gold" id="btn-walkthrough-next" onclick="nextWalkthroughSlide()" style="width: 100%;">
+        Next Step
+      </button>
+    </div>
+
+    <!-- C. AUTHENTICATION OVERLAY MODAL -->
+    <div class="auth-modal-overlay" id="auth-modal-overlay" style="display: none;">
+      <div class="auth-modal" style="padding: 2.25rem;">
+        <div class="auth-header" style="text-align: center; margin-bottom: 1.5rem;">
+          <img src="/logo_primary.svg" alt="SmartStock" style="height: 85px; width: auto; margin-bottom: 0.5rem; filter: drop-shadow(0 4px 10px rgba(212,175,55,0.15));">
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Login to Organization Portal</p>
+        </div>
+
+        <div class="auth-tabs">
+          <button class="auth-tab active" id="btn-tab-login" onclick="switchAuthTab('login')">Sign In</button>
+          <button class="auth-tab" id="btn-tab-signup" onclick="switchAuthTab('signup')">Register Org</button>
+        </div>
+
+        <!-- SIGN IN FORM -->
+        <div class="auth-form-view active" id="auth-form-login">
+          <form onsubmit="handleLoginSubmit(event)">
+            <div class="form-group">
+              <label>User Email Address</label>
+              <input type="email" id="login-email" class="form-control" required value="admin@smartstock.io">
+            </div>
+            <div class="form-group">
+              <label>Password</label>
+              <input type="password" id="login-password" class="form-control" required value="password123">
+            </div>
+            <button type="submit" class="btn btn-gold" style="width: 100%; margin-top: 0.5rem;">
+              Sign In
+            </button>
+          </form>
+
+          <div class="auth-demo-box">
+            <strong>Hierarchical Demo Accounts:</strong><br>
+            Admin: <code>admin@smartstock.io</code> | password123<br>
+            Manager: <code>manager@smartstock.io</code> | password123<br>
+            Staff: <code>staff@smartstock.io</code> | password123
+          </div>
+        </div>
+
+        <!-- REGISTER FORM -->
+        <div class="auth-form-view" id="auth-form-signup">
+          <form onsubmit="handleSignupSubmit(event)">
+            <div class="form-group">
+              <label>Organization Name</label>
+              <input type="text" id="signup-org-name" class="form-control" required placeholder="e.g. Acme Corp">
+            </div>
+            <div class="form-group">
+              <label>Admin Email</label>
+              <input type="email" id="signup-email" class="form-control" required placeholder="admin@acme.com">
+            </div>
+            <div class="form-group">
+              <label>Admin Password</label>
+              <input type="password" id="signup-password" class="form-control" required placeholder="Create strong password">
+            </div>
+            <div class="form-group">
+              <label>Industry</label>
+              <select id="signup-industry" class="form-control">
+                <option value="Electronics & Smart Home">Consumer Electronics</option>
+                <option value="Supermarket & Grocery">Supermarket & Grocery</option>
+                <option value="Apparel & Fashion">Apparel & Fashion</option>
+                <option value="General Retail">General Retail</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-gold" style="width: 100%; margin-top: 0.5rem;">
+              Register Organization
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- D. GLOBAL APP HEADER -->
+    <header id="main-app-header">
+      <div class="brand-title" style="display: flex; align-items: center; gap: 0.5rem;">
+        <img src="/logo_horizontal.svg" alt="SmartStock Logo" style="height: 28px; width: auto; display: block;">
+      </div>
+
+      <div class="org-info-container" id="hdr-org-badge">
+        <span id="hdr-org-name">SmartStock Global</span>
+      </div>
+    </header>
+
+    <!-- E. SCROLLABLE CONTENT VIEWPORTS -->
+    <div class="app-content" id="app-scroll-container">
+
+      <!-- 1. OVERVIEW TAB VIEW -->
+      <div class="tab-view active" id="tab-dashboard">
+        <!-- Multi-Branch Status Toggle Banner -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--color-white); border: 1px solid var(--border-color); padding: 0.5rem 0.75rem; border-radius: var(--radius); margin-bottom: 0.85rem; font-size: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.35rem;">
+            <div class="status-indicator" id="network-dot"></div>
+            <span id="network-text">Connected</span>
+          </div>
+          <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.65rem;" onclick="toggleNetworkMode()">
+            Offline Mode
+          </button>
+        </div>
+
+        <div class="metric-grid-2">
+          <div class="card metric-card">
+            <div class="metric-title">Expiry Alerts</div>
+            <div class="metric-value" id="stat-fast-selling">0</div>
+          </div>
+          <div class="card metric-card">
+            <div class="metric-title">Auto Reorders</div>
+            <div class="metric-value" id="stat-reorders">0</div>
+          </div>
+        </div>
+
+        <div class="metric-grid-2">
+          <div class="card metric-card">
+            <div class="metric-title">Redistribution savings</div>
+            <div class="metric-value" id="stat-savings">$0.00</div>
+          </div>
+          <div class="card metric-card">
+            <div class="metric-title">Active Requests</div>
+            <div class="metric-value" id="stat-discrepancies">0</div>
+          </div>
+        </div>
+
+        <!-- Sales Velocity Card -->
+        <div class="card">
+          <div class="section-header">
+            <div class="section-title">Sales Velocity Spikes</div>
+            <button class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.7rem;" onclick="simulateSaleSpike()">
+              Trigger Sale
+            </button>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Spike</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-velocity-table">
+                <!-- Dynamically loaded -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. MY STOCK TAB VIEW -->
+      <div class="tab-view" id="tab-catalog">
+        <!-- Sub-tabs switching buttons -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 0.85rem; background: rgba(92, 27, 117, 0.05); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 0.25rem;">
+          <button class="btn" id="btn-subtab-inventory" style="padding: 0.4rem; font-size: 0.7rem; background: var(--color-purple-primary); color: white;" onclick="switchSubTab('inventory')">
+            Catalog Inventory
+          </button>
+          <button class="btn btn-secondary" id="btn-subtab-purchaselist" style="padding: 0.4rem; font-size: 0.7rem;" onclick="switchSubTab('purchaselist')">
+            Market Purchase List
+          </button>
+          <button class="btn btn-secondary" id="btn-subtab-categories" style="padding: 0.4rem; font-size: 0.7rem;" onclick="switchSubTab('categories')">
+            Product Categories
+          </button>
+        </div>
+
+        <!-- Inventory Sub-view -->
+        <div id="subview-inventory">
+          <div class="section-header" style="margin-bottom: 0.65rem;">
+            <div class="section-title" style="font-size: 0.95rem;">My Stock Catalog</div>
+            <div style="display: flex; gap: 0.4rem;">
+              <button class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.75rem; border-color: var(--color-gold); color: var(--color-purple-primary); font-weight: 600;" onclick="syncIClassData()">
+                Sync IClass
+              </button>
+              <button class="btn btn-gold" id="btn-show-add-product" style="padding: 0.4rem 0.8rem; font-size: 0.75rem;" onclick="toggleManualProductForm()">
+                + Add Item
+              </button>
+            </div>
+          </div>
+
+          <!-- COLLAPSIBLE FORM FOR MANUAL PRODUCT CREATION -->
+          <div class="card" id="manual-product-card" style="display: none; border-top: 3px solid var(--color-gold); transition: var(--transition);">
+            <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 0.75rem; color: var(--color-purple-primary);">
+              Register New Inventory Item
+            </div>
+            <form onsubmit="submitNewProductManual(event)">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <div class="form-group">
+                  <label>SKU Code</label>
+                  <input type="text" id="manual-sku" class="form-control" placeholder="e.g. TS-200" required>
+                </div>
+                <div class="form-group">
+                  <label>Product Name</label>
+                  <input type="text" id="manual-name" class="form-control" placeholder="e.g. Eco Thermostat v2" required>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <div class="form-group">
+                  <label>Category</label>
+                  <select id="manual-category" class="form-control" required></select>
+                </div>
+                <div class="form-group">
+                  <label>Unit Volume (m³)</label>
+                  <input type="number" step="0.0001" id="manual-volume" class="form-control" placeholder="e.g. 0.0012" required>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <div class="form-group">
+                  <label>Cost Price ($)</label>
+                  <input type="number" step="0.01" id="manual-cost" class="form-control" placeholder="e.g. 80.00" required>
+                </div>
+                <div class="form-group">
+                  <label>Retail Price ($)</label>
+                  <input type="number" step="0.01" id="manual-price" class="form-control" placeholder="e.g. 150.00" required>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <div class="form-group">
+                  <label>Safety Stock</label>
+                  <input type="number" id="manual-safety" class="form-control" value="20">
+                </div>
+                <div class="form-group">
+                  <label>Min Reorder Point</label>
+                  <input type="number" id="manual-reorder" class="form-control" value="40">
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <div class="form-group">
+                  <label>Lead Time (days)</label>
+                  <input type="number" id="manual-lead" class="form-control" value="5">
+                </div>
+                <div class="form-group">
+                  <label>Supplier Name</label>
+                  <input type="text" id="manual-supplier" class="form-control" placeholder="Apex Electronics">
+                </div>
+              </div>
+
+              <div style="font-weight: 600; font-size: 0.75rem; color: var(--text-muted); margin: 0.5rem 0 0.25rem;">
+                Initial Inventory Levels
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.4rem; margin-bottom: 0.85rem;">
+                <div class="form-group">
+                  <label>Main Wh</label>
+                  <input type="number" id="manual-main-qty" class="form-control" value="100">
+                </div>
+                <div class="form-group">
+                  <label>North Br</label>
+                  <input type="number" id="manual-north-qty" class="form-control" value="20">
+                </div>
+                <div class="form-group">
+                  <label>South Br</label>
+                  <input type="number" id="manual-south-qty" class="form-control" value="30">
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 0.5rem;">
+                <button type="submit" class="btn btn-gold" style="flex: 1;">Register Item</button>
+                <button type="button" class="btn btn-secondary" onclick="toggleManualProductForm()">Cancel</button>
+              </div>
+            </form>
+          </div>
+
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.85rem;">
+            <input type="text" id="catalog-search" class="form-control" placeholder="Search product/SKU..." onkeyup="filterCatalog()">
+          </div>
+          <div id="catalog-list-view" style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <!-- Dynamically populated card list -->
+          </div>
+        </div>
+
+        <!-- Purchase Checklist Sub-view -->
+        <div id="subview-purchaselist" style="display: none;">
+          <div class="section-header" style="margin-bottom: 0.65rem;">
+            <div class="section-title" style="font-size: 0.95rem;">Market Purchase List</div>
+            <button class="btn btn-gold" style="padding: 0.4rem 0.8rem; font-size: 0.75rem;" onclick="togglePurchaseForm()">
+              + New Item
+            </button>
+          </div>
+
+          <!-- COLLAPSIBLE FORM FOR PURCHASE LIST ENTRY -->
+          <div class="card" id="purchase-form-card" style="display: none; border-top: 3px solid var(--color-gold); transition: var(--transition);">
+            <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 0.75rem; color: var(--color-purple-primary);">
+              Add Item to Market Purchase List
+            </div>
+            <form onsubmit="submitPurchaseListItem(event)">
+              <div class="form-group">
+                <label>Item Name</label>
+                <input type="text" id="purchase-item-name" class="form-control" placeholder="e.g. Printer Toner Cartridges" required>
+              </div>
+              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem;">
+                <div class="form-group">
+                  <label>Category</label>
+                  <select id="purchase-item-category" class="form-control" required>
+                    <option value="Electronics & Smart Home">Electronics & Smart Home</option>
+                    <option value="Groceries & Consumables">Groceries & Consumables</option>
+                    <option value="Packaging & Delivery">Packaging & Delivery</option>
+                    <option value="Office Stationery">Office Stationery</option>
+                    <option value="General Retail">General Retail</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Quantity</label>
+                  <input type="number" id="purchase-item-qty" class="form-control" value="1" min="1" required>
+                </div>
+              </div>
+              <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                <button type="submit" class="btn btn-gold" style="flex: 1;">Add to List</button>
+                <button type="button" class="btn btn-secondary" onclick="togglePurchaseForm()">Cancel</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Categorized Checklist View -->
+          <div id="purchase-list-view" style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <!-- Dynamically loaded list of shopping items grouped by categories -->
+          </div>
+        </div>
+
+        <!-- Categories Sub-view -->
+        <div id="subview-categories" style="display: none;">
+          <div class="section-header" style="margin-bottom: 0.65rem;">
+            <div class="section-title" style="font-size: 0.95rem;">Manage Product Categories</div>
+            <button class="btn btn-gold" id="btn-show-add-category" style="padding: 0.4rem 0.8rem; font-size: 0.75rem;" onclick="toggleManualCategoryForm()">
+              + New Category
+            </button>
+          </div>
+
+          <!-- COLLAPSIBLE FORM FOR NEW CATEGORY -->
+          <div class="card" id="manual-category-card" style="display: none; border-top: 3px solid var(--color-gold); transition: var(--transition);">
+            <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 0.75rem; color: var(--color-purple-primary);">
+              Create Product Category
+            </div>
+            <form onsubmit="submitNewCategory(event)">
+              <div class="form-group">
+                <label>Category Name</label>
+                <input type="text" id="category-input-name" class="form-control" placeholder="e.g. Beverages & Drinks" required>
+              </div>
+              <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                <button type="submit" class="btn btn-gold" style="flex: 1;">Create Category</button>
+                <button type="button" class="btn btn-secondary" onclick="toggleManualCategoryForm()">Cancel</button>
+              </div>
+            </form>
+          </div>
+
+          <div id="categories-list-view" style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <!-- Dynamically populated list of categories and product counts -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. SCANNER TAB VIEW -->
+      <div class="tab-view" id="tab-scanner">
+        
+        <!-- Scanner Sub-tabs Selection -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.85rem; background: rgba(92, 27, 117, 0.05); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 0.25rem;">
+          <button class="btn" id="btn-scanner-subtab-barcode" style="padding: 0.4rem; font-size: 0.75rem; background: var(--color-purple-primary); color: white;" onclick="switchScannerSubTab('barcode')">
+            Barcode Intake
+          </button>
+          <button class="btn btn-secondary" id="btn-scanner-subtab-ocr" style="padding: 0.4rem; font-size: 0.75rem;" onclick="switchScannerSubTab('ocr')">
+            Invoice OCR
+          </button>
+        </div>
+
+        <!-- BARCODE INTAKE SCANNER BLOCK -->
+        <div id="scanner-view-barcode">
+          <div class="card">
+            <div class="section-header">
+              <div class="section-title">Intake Barcode Scanner</div>
+              <span class="badge badge-fast">Local Cache Active</span>
+            </div>
+
+            <!-- Camera Access Permission State Box -->
+            <div id="camera-permission-box" style="margin-bottom: 0.85rem; padding: 0.6rem; border-radius: var(--radius); background: rgba(197,160,89,0.1); border: 1px solid var(--color-gold); font-size: 0.75rem; text-align: center;">
+              <div style="font-weight: 700; color: var(--color-purple-primary); margin-bottom: 0.25rem;" id="camera-perm-title">
+                Camera Permission Required
+              </div>
+              <div style="color: var(--text-muted); margin-bottom: 0.5rem;" id="camera-perm-desc">
+                SmartStock needs camera permissions to start the barcode reader sensor.
+              </div>
+              <button class="btn btn-gold" style="padding: 0.35rem 0.75rem; font-size: 0.7rem;" onclick="requestCameraPermissionDirectly()" id="camera-perm-btn">
+                Grant Permission
+              </button>
+            </div>
+
+            <div class="scanner-viewport">
+              <div class="scan-laser" id="scanner-viewport-laser" style="display: none;"></div>
+              <div style="color: var(--text-dim); font-size: 0.75rem; font-weight: 600;" id="camera-mode-status">
+                Camera: Locked
+              </div>
+              <button class="btn btn-secondary" id="btn-camera-toggle" style="position: absolute; bottom: 10px; padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: var(--color-gold); display: none;" onclick="toggleScannerCamera()">
+                Switch Camera
+              </button>
+            </div>
+
+            <div style="margin-top: 1rem;">
+              <div class="form-group">
+                <label>Scan / Type Product SKU</label>
+                <div style="display: flex; gap: 0.5rem;">
+                  <input type="text" id="scanner-barcode-input" class="form-control" placeholder="Enter SKU (e.g. TS-100)">
+                  <button class="btn btn-gold" onclick="processBarcodeScan()">Intake</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="section-header">
+              <div class="section-title">Local Queue Logs</div>
+            </div>
+            <div id="scan-queue-list" style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.75rem;">
+              <!-- Offline cache list -->
+            </div>
+          </div>
+        </div>
+
+        <!-- RECEIPT/INVOICE OCR SCANNER BLOCK -->
+        <div id="scanner-view-ocr" style="display: none;">
+          <!-- Document Selector Card -->
+          <div class="card" id="ocr-selector-card">
+            <div class="section-title" style="margin-bottom: 0.75rem;">Document Scanner Intake</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">
+              Scan or upload purchase receipts/invoices. The OCR engine will extract line items, prices, and totals.
+            </div>
+            
+            <input type="file" id="ocr-file-input" style="display: none;" accept="image/*" onchange="handleOCRFileUpload(event)">
+            
+            <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+              <button class="btn btn-gold" style="justify-content: center; padding: 0.65rem;" onclick="triggerOCRFileSelect()">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.4rem;">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                Upload Invoice Image
+              </button>
+              <button class="btn btn-secondary" style="justify-content: center; padding: 0.65rem;" onclick="captureOCRCameraSnapshot()">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.4rem;">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                  <circle cx="12" cy="13" r="4"></circle>
+                </svg>
+                Capture Receipt Snapshot
+              </button>
+            </div>
+          </div>
+
+          <!-- Scanning Loader Overlay -->
+          <div class="card" id="ocr-loader-card" style="display: none; position: relative; overflow: hidden; padding: 1.5rem; text-align: center;">
+            <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--color-gold); animation: scannerScanLaser 1.5s infinite linear;"></div>
+            <div style="margin: 0.5rem auto 1rem; width: 40px; height: 40px; border: 4px solid rgba(92,27,117,0.1); border-top-color: var(--color-gold); border-radius: 50%; animation: spin 1s infinite linear;"></div>
+            <div style="font-weight: 700; color: var(--color-purple-primary); margin-bottom: 0.25rem;">Processing Document Layout</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">SmartStock OCR is reading item descriptions and pricing coordinates...</div>
+          </div>
+
+          <!-- OCR Form Editor Card -->
+          <div class="card" id="ocr-results-card" style="display: none; border-top: 3px solid var(--color-gold);">
+            <div style="font-weight: 700; font-size: 0.95rem; color: var(--color-purple-primary); margin-bottom: 0.85rem;">
+              Verify & Edit Extracted Details
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.75rem;">
+              <div class="form-group">
+                <label>Invoice Number</label>
+                <input type="text" id="ocr-invoice-id" class="form-control" required placeholder="e.g. INV-1002">
+              </div>
+              <div class="form-group">
+                <label>Supplier / Vendor</label>
+                <input type="text" id="ocr-supplier-name" class="form-control" required placeholder="e.g. Acme Distributors">
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.75rem;">
+              <div class="form-group">
+                <label>Billing Date</label>
+                <input type="date" id="ocr-invoice-date" class="form-control" required>
+              </div>
+              <div class="form-group">
+                <label>Intake Branch Destination</label>
+                <select id="ocr-invoice-branch" class="form-control" required>
+                  <option value="Main Warehouse">Main Warehouse</option>
+                  <option value="North Branch">North Branch</option>
+                  <option value="South Branch">South Branch</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="font-weight: 700; font-size: 0.8rem; margin: 0.85rem 0 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.5rem;">
+              Line Items Table
+            </div>
+
+            <!-- Editable Line Items Table -->
+            <div class="table-scroll" style="margin-bottom: 0.5rem;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                  <tr style="font-size: 0.7rem;">
+                    <th style="width: 25%;">SKU</th>
+                    <th style="width: 40%;">Product Name</th>
+                    <th style="width: 15%; text-align: center;">Qty</th>
+                    <th style="width: 20%; text-align: right;">Cost ($)</th>
+                    <th style="width: 5%;"></th>
+                  </tr>
+                </thead>
+                <tbody id="ocr-line-items-body">
+                  <!-- Generated rows dynamically -->
+                </tbody>
+              </table>
+            </div>
+
+            <button class="btn btn-secondary" style="width: 100%; padding: 0.35rem; font-size: 0.75rem; margin-bottom: 0.85rem;" onclick="addOcrLineItemRow()">
+              + Add Line Item Manually
+            </button>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 0.75rem; margin-bottom: 1rem;">
+              <div style="font-weight: 700; font-size: 0.85rem;">Grand Total:</div>
+              <div style="font-weight: 700; font-size: 1.05rem; color: var(--color-purple-primary);" id="ocr-invoice-total-display">$0.00</div>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-gold" style="flex: 1;" onclick="submitOcrInvoice()">Save & Document</button>
+              <button class="btn btn-secondary" onclick="resetOcrScanner()">Discard</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 4. CUSTOMER REQUESTS TAB VIEW -->
+      <div class="tab-view" id="tab-requests">
+        <div class="section-header" style="margin-bottom: 0.75rem;">
+          <div class="section-title">Workflow & Approval Hub</div>
+        </div>
+
+        <!-- Workflow Sub-tabs Selector -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.35rem; margin-bottom: 0.85rem; background: rgba(92, 27, 117, 0.05); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 0.25rem;">
+          <button class="btn" id="subtab-req-customer" style="padding: 0.4rem 0.2rem; font-size: 0.7rem; background: var(--color-purple-primary); color: white;" onclick="switchReqModule('customer')">
+            Cust Orders
+          </button>
+          <button class="btn btn-secondary" id="subtab-req-expiry" style="padding: 0.4rem 0.2rem; font-size: 0.7rem; border: none;" onclick="switchReqModule('expiry')">
+            Expiry Reports
+          </button>
+          <button class="btn btn-secondary" id="subtab-req-stock" style="padding: 0.4rem 0.2rem; font-size: 0.7rem; border: none;" onclick="switchReqModule('stock')">
+            Stock Adjust
+          </button>
+        </div>
+
+        <!-- 4A. CUSTOMER REQUESTS SUB-VIEW -->
+        <div id="subview-req-customer">
+          <!-- Search & Filter panel -->
+          <div class="card" style="padding: 0.75rem; margin-bottom: 0.85rem;">
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <input type="text" id="req-search" class="form-control" placeholder="Search orders/names..." oninput="filterCustomerRequests()" style="font-size: 0.75rem; padding: 0.4rem 0.6rem;">
+              <select id="req-filter-priority" class="form-control" onchange="filterCustomerRequests()" style="font-size: 0.75rem; padding: 0.4rem; width: 110px;">
+                <option value="all">All Priority</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <select id="req-filter-status" class="form-control" onchange="filterCustomerRequests()" style="font-size: 0.75rem; padding: 0.4rem;">
+                <option value="all">All Status</option>
+                <option value="Pending">Pending</option>
+                <option value="Verified">Verified</option>
+                <option value="Completed">Completed</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+              <select id="req-filter-scope" class="form-control" onchange="filterCustomerRequests()" style="font-size: 0.75rem; padding: 0.4rem; width: 125px;">
+                <option value="all">All Entries</option>
+                <option value="mine">My Requests</option>
+                <option value="dept">Dept Requests</option>
+              </select>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; color: var(--text-muted);">
+              <span>From:</span>
+              <input type="date" id="req-filter-start" class="form-control" onchange="filterCustomerRequests()" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; height: auto;">
+              <span>To:</span>
+              <input type="date" id="req-filter-end" class="form-control" onchange="filterCustomerRequests()" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; height: auto;">
+            </div>
+          </div>
+
+          <!-- ALWAYS-VISIBLE FORM FOR STAFF CREATING CUSTOMER REQUESTS -->
+          <div class="card" id="manual-request-card" style="display: none; border-top: 3px solid var(--color-gold); transition: var(--transition);">
+            <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 0.75rem; color: var(--color-purple-primary);">
+              Take Customer Order / Request
+            </div>
+            <form onsubmit="submitNewCustomerRequest(event)">
+              <div class="form-group">
+                <label>Customer Name</label>
+                <input type="text" id="req-cust-name" class="form-control" placeholder="e.g. Alice Smith" required>
+              </div>
+              <div class="form-group">
+                <label>Customer Email</label>
+                <input type="email" id="req-cust-email" class="form-control" placeholder="e.g. alice@gmail.com" required>
+              </div>
+              <div class="form-group">
+                <label>Item Description / Specifications</label>
+                <input type="text" id="req-cust-desc" class="form-control" placeholder="e.g. Size L, Color Blue, with warranty" required>
+              </div>
+              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem;">
+                <div class="form-group">
+                  <label>Requested Item</label>
+                  <input type="text" id="req-cust-sku" list="catalog-suggestions" class="form-control" placeholder="e.g. EcoSmart Smart Thermostat" required>
+                  <datalist id="catalog-suggestions"></datalist>
+                </div>
+                <div class="form-group">
+                  <label>Quantity</label>
+                  <input type="number" id="req-cust-qty" class="form-control" value="1" min="1" required>
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <div class="form-group">
+                  <label>Product Category</label>
+                  <select id="req-cust-category" class="form-control" required></select>
+                </div>
+                <div class="form-group">
+                  <label>Priority</label>
+                  <select id="req-cust-priority" class="form-control" required>
+                    <option value="Low">Low</option>
+                    <option value="Medium" selected>Medium</option>
+                    <option value="High">High</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Instructions & Hold Notes</label>
+                <textarea id="req-cust-notes" class="form-control" rows="2" placeholder="Specific branch pick up details..."></textarea>
+              </div>
+
+              <button type="submit" class="btn btn-gold" style="width: 100%;">Upload Request</button>
+            </form>
+          </div>
+
+          <div id="requests-list-view" style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <!-- Dynamically populated customer requests list -->
+          </div>
+        </div>
+
+        <!-- 4B. EXPIRY REPORTS SUB-VIEW -->
+        <div id="subview-req-expiry" style="display: none;">
+          <div class="card" id="expiry-report-card" style="border-top: 3px solid var(--state-crimson);">
+            <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 0.75rem; color: var(--color-purple-primary);">
+              Record Expired / Nearing Expiry Product
+            </div>
+            <form onsubmit="submitExpiryReport(event)">
+              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem;">
+                <div class="form-group">
+                  <label>Product / Item</label>
+                  <input type="text" id="expiry-item-sku" list="expiry-sku-suggestions" class="form-control" placeholder="Select SKU" required>
+                  <datalist id="expiry-sku-suggestions"></datalist>
+                </div>
+                <div class="form-group">
+                  <label>Qty Affected</label>
+                  <input type="number" id="expiry-qty" class="form-control" value="1" min="1" required>
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <div class="form-group">
+                  <label>Batch Number</label>
+                  <input type="text" id="expiry-batch" class="form-control" placeholder="e.g. BATCH-A" required>
+                </div>
+                <div class="form-group">
+                  <label>Expiry Date</label>
+                  <input type="date" id="expiry-date" class="form-control" required>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Simulate Product Photo URL</label>
+                <input type="text" id="expiry-image" class="form-control" placeholder="e.g. box.png">
+              </div>
+              <div class="form-group">
+                <label>Observations / Notes</label>
+                <textarea id="expiry-notes" class="form-control" rows="2" placeholder="Describe storage condition or details..."></textarea>
+              </div>
+              <button type="submit" class="btn btn-gold" style="width: 100%;">Submit Expiry Report</button>
+            </form>
+          </div>
+
+          <div id="expiry-reports-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- 4C. STOCK ADJUSTMENTS SUB-VIEW -->
+        <div id="subview-req-stock" style="display: none;">
+          <div class="card" id="stock-adjustment-card" style="border-top: 3px solid var(--color-gold);">
+            <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 0.75rem; color: var(--color-purple-primary);">
+              Submit Stock Adjustment Report
+            </div>
+            <form onsubmit="submitStockAdjustment(event)">
+              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem;">
+                <div class="form-group">
+                  <label>Product / Item</label>
+                  <input type="text" id="adjust-item-sku" list="adjust-sku-suggestions" class="form-control" placeholder="Select SKU" required>
+                  <datalist id="adjust-sku-suggestions"></datalist>
+                </div>
+                <div class="form-group">
+                  <label>Adjust Qty</label>
+                  <input type="number" id="adjust-qty" class="form-control" placeholder="e.g. -5 or +10" required>
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <div class="form-group">
+                  <label>Branch Outlet</label>
+                  <select id="adjust-branch" class="form-control" required>
+                    <option value="Main Warehouse">Main Warehouse</option>
+                    <option value="North Branch">North Branch</option>
+                    <option value="South Branch">South Branch</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Adjustment Type</label>
+                  <select id="adjust-type" class="form-control" required>
+                    <option value="Damaged Stock">Damaged Stock</option>
+                    <option value="Observation Correction">Observation Correction</option>
+                    <option value="Theft / Lost">Theft / Lost</option>
+                    <option value="Other">Other Reason</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Justification Reason / Notes</label>
+                <textarea id="adjust-notes" class="form-control" rows="2" placeholder="Explain findings..." required></textarea>
+              </div>
+              <button type="submit" class="btn btn-gold" style="width: 100%;">Submit Adjustment Report</button>
+            </form>
+          </div>
+
+          <div id="stock-adjustments-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. MORE OPTIONS TAB VIEW (Reorders, User Management, Settings, Audits, Suppliers, Sign Out) -->
+      <div class="tab-view" id="tab-more">
+        
+        <!-- User Profile Card -->
+        <div class="card" style="text-align: center;">
+          <div style="width: 60px; height: 60px; background: rgba(92, 27, 117, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem; color: var(--color-purple-primary);">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+          <div style="font-weight: 700; color: var(--color-purple-primary);" id="more-profile-name">User Account</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;" id="more-profile-email">email@org.com</div>
+          <span class="badge badge-fast" id="more-profile-role" style="letter-spacing: 0.05em;">Role</span>
+        </div>
+
+        <!-- HIERARCHICAL ACCOUNT MANAGEMENT -->
+        <div class="card" id="user-management-card" style="display: none;">
+          <div class="section-header" style="margin-bottom: 0.75rem;">
+            <div class="section-title" id="user-mgr-title">Team Member Accounts</div>
+          </div>
+
+          <!-- Account Creation Form -->
+          <div style="background: var(--bg-body); border: 1px solid var(--border-color); padding: 0.75rem; border-radius: var(--radius); margin-bottom: 0.85rem;">
+            <div style="font-weight: 700; font-size: 0.8rem; margin-bottom: 0.5rem;" id="user-creation-form-label">Create Team Member</div>
+            <form onsubmit="submitNewUserAccount(event)">
+              <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="user-new-name" class="form-control" required placeholder="e.g. John Doe">
+              </div>
+              <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" id="user-new-email" class="form-control" required placeholder="e.g. john@smartstock.io">
+              </div>
+              <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="user-new-password" class="form-control" required placeholder="Password">
+              </div>
+              <div class="form-group">
+                <label>Account Role</label>
+                <select id="user-new-role" class="form-control" required></select>
+              </div>
+              <button type="submit" class="btn btn-gold" style="width: 100%; font-size: 0.75rem; padding: 0.5rem;">
+                Register Account
+              </button>
+            </form>
+          </div>
+
+          <!-- Existing users list -->
+          <div id="users-list-container" style="display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.75rem;">
+            <!-- Dynamically loaded list of team members -->
+          </div>
+        </div>
+
+        <!-- AI REORDERS ACCORDION -->
+        <div class="card" id="more-reorders-card">
+          <div style="font-weight: 700; font-size: 0.95rem; color: var(--color-purple-primary); margin-bottom: 0.5rem;">
+            Suggested AI Purchase Orders
+          </div>
+          <div id="intelligence-reorder-list" style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.75rem;">
+            <!-- Suggested POs -->
+          </div>
+        </div>
+
+        <!-- REDISTRIBUTION TRANSFERS ACCORDION -->
+        <div class="card" id="more-transfers-card">
+          <div style="font-weight: 700; font-size: 0.95rem; color: var(--color-purple-primary); margin-bottom: 0.5rem;">
+            Branch stock redistributions
+          </div>
+          <div id="intelligence-transfer-list" style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.75rem;">
+            <!-- Suggested transfers -->
+          </div>
+        </div>
+
+        <!-- Invoices & Receipts Ledger Card -->
+        <div class="card" id="more-invoices-card">
+          <div class="section-header" style="margin-bottom: 0.75rem;">
+            <div class="section-title" style="font-size: 0.95rem;">Invoice & Receipt Ledger</div>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+            Historically documented purchase receipts and invoices:
+          </div>
+          <div id="invoice-ledger-list" style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.75rem; max-height: 250px; overflow-y: auto;">
+            <!-- Loaded dynamically -->
+          </div>
+        </div>
+
+        <!-- Audits List Card -->
+        <div class="card">
+          <div class="section-title" style="margin-bottom: 0.5rem;">Stock Auditing</div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Expected</th>
+                  <th>Actual</th>
+                  <th>Variance</th>
+                </tr>
+              </thead>
+              <tbody id="audit-table-body">
+                <!-- Loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Activity Audits Ledger Card -->
+        <div class="card" id="more-activity-logs-card" style="display: none;">
+          <div class="section-header" style="margin-bottom: 0.75rem;">
+            <div class="section-title" style="font-size: 0.95rem;">Organization Activity Logs</div>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+            Audit trail of all administrative and operational actions:
+          </div>
+          <div id="activity-logs-list" style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.72rem; max-height: 250px; overflow-y: auto; font-family: monospace;">
+            <!-- Loaded dynamically -->
+          </div>
+        </div>
+
+        <!-- Settings Card -->
+        <div class="card">
+          <div class="section-title" style="margin-bottom: 0.75rem;">AI & Alert Settings</div>
+          <div class="form-group">
+            <label>Multi-Branch Scope</label>
+            <select id="setting-branch-scope" class="form-control">
+              <option value="all">Global Scope Visibility</option>
+              <option value="restricted">Restricted Local Branch</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Sales velocity sensitivity</label>
+            <select id="setting-sensitivity" class="form-control">
+              <option value="high">High (1.2x spikes)</option>
+              <option value="medium" selected>Medium (1.5x spikes)</option>
+              <option value="low">Low (2.0x spikes)</option>
+            </select>
+          </div>
+
+          <div style="font-weight: 700; font-size: 0.8rem; color: var(--color-purple-primary); margin: 0.75rem 0 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.5rem;">
+            Preferred Notification Channels
+          </div>
+          
+          <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <input type="checkbox" id="setting-alert-wa" onchange="toggleSettingInput('setting-alert-wa-phone-container')">
+            <label style="margin: 0; font-weight: 600;">Enable WhatsApp Alerts</label>
+          </div>
+          <div class="form-group" id="setting-alert-wa-phone-container" style="display: none; margin-left: 1.25rem;">
+            <label>Target Phone Number</label>
+            <input type="text" id="setting-alert-wa-phone" class="form-control" placeholder="e.g. +1234567890">
+          </div>
+
+          <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <input type="checkbox" id="setting-alert-em" onchange="toggleSettingInput('setting-alert-em-email-container')">
+            <label style="margin: 0; font-weight: 600;">Enable Email Alerts</label>
+          </div>
+          <div class="form-group" id="setting-alert-em-email-container" style="display: none; margin-left: 1.25rem;">
+            <label>Target Email Address</label>
+            <input type="email" id="setting-alert-em-email" class="form-control" placeholder="e.g. alerts@org.com">
+          </div>
+
+          <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <input type="checkbox" id="setting-alert-tg" onchange="toggleSettingInput('setting-alert-tg-chatid-container')">
+            <label style="margin: 0; font-weight: 600;">Enable Telegram Alerts</label>
+          </div>
+          <div class="form-group" id="setting-alert-tg-chatid-container" style="display: none; margin-left: 1.25rem;">
+            <label>Telegram Username / Chat ID</label>
+            <input type="text" id="setting-alert-tg-chatid" class="form-control" placeholder="e.g. @retail_admin_bot">
+          </div>
+
+          <button class="btn btn-gold" style="width: 100%; margin-top: 0.75rem;" onclick="saveSettings()">
+            Save Configuration
+          </button>
+        </div>
+
+        <!-- Automated Alert Logs Card -->
+        <div class="card" id="alert-logs-card">
+          <div class="section-header" style="margin-bottom: 0.75rem;">
+            <div class="section-title" style="font-size: 0.95rem;">Automated Alerts Dispatch</div>
+            <button class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.7rem;" onclick="simulateAlerts()">
+              Simulate Alerts
+            </button>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+            Shows dispatched alerts based on active notification choices:
+          </div>
+          <div id="alert-logs-container" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.7rem;">
+            <!-- Loaded dynamically -->
+          </div>
+        </div>
+
+        <!-- AI Voice Assistant Settings -->
+        <div class="card" id="voice-settings-card">
+          <div class="section-title" style="margin-bottom: 0.75rem;">AI Voice Assistant Settings</div>
+          
+          <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <input type="checkbox" id="setting-voice-enabled" onchange="toggleVoiceAssistantSettings()">
+            <label style="margin: 0; font-weight: 600; cursor: pointer;" for="setting-voice-enabled">Enable Voice Assistant</label>
+          </div>
+          
+          <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <input type="checkbox" id="setting-voice-responses" onchange="toggleVoiceAssistantSettings()">
+            <label style="margin: 0; font-weight: 600; cursor: pointer;" for="setting-voice-responses">Enable Voice Responses</label>
+          </div>
+          
+          <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <input type="checkbox" id="setting-voice-ptt" onchange="toggleVoiceAssistantSettings()">
+            <label style="margin: 0; font-weight: 600; cursor: pointer;" for="setting-voice-ptt">Enable Push-to-Talk</label>
+          </div>
+
+          <div class="form-group">
+            <label>Voice Language</label>
+            <select id="setting-voice-lang" class="form-control" onchange="toggleVoiceAssistantSettings()">
+              <option value="en-US">English (US)</option>
+              <option value="en-GB">English (UK)</option>
+              <option value="es-ES">Spanish (Spain)</option>
+              <option value="fr-FR">French (France)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Speech Speed (Speed: <span id="lbl-voice-speed">1.0</span>x)</label>
+            <input type="range" id="setting-voice-speed" min="0.5" max="2.0" step="0.1" value="1.0" class="form-control" style="height: auto;" oninput="updateVoiceSettingsLabels(); toggleVoiceAssistantSettings()">
+          </div>
+
+          <div class="form-group">
+            <label>Voice Volume (Volume: <span id="lbl-voice-volume">100</span>%)</label>
+            <input type="range" id="setting-voice-volume" min="0" max="1" step="0.1" value="1.0" class="form-control" style="height: auto;" oninput="updateVoiceSettingsLabels(); toggleVoiceAssistantSettings()">
+          </div>
+
+          <div style="font-weight: 700; font-size: 0.8rem; color: var(--color-purple-primary); margin: 0.75rem 0 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.5rem;">
+            Voice Command History
+          </div>
+          <div id="voice-history-list" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 150px; overflow-y: auto; font-size: 0.72rem; margin-bottom: 0.5rem; background: var(--bg-body); padding: 0.4rem; border-radius: var(--radius); border: 1px solid var(--border-color);">
+            <div style="color: var(--text-muted); text-align: center; padding: 0.5rem;">No commands recorded.</div>
+          </div>
+          <button class="btn btn-secondary" style="width: 100%; justify-content: center; padding: 0.4rem; font-size: 0.75rem;" onclick="clearVoiceHistory()">
+            Clear History
+          </button>
+        </div>
+
+        <!-- Third-Party Integration Settings -->
+        <div class="card">
+          <div class="section-title" style="margin-bottom: 0.75rem;">Third-Party Integration</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+            Source inventory dynamically from your desktop management systems:
+          </div>
+          <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <input type="checkbox" id="setting-iclass-sync" onchange="toggleSettingInput('setting-iclass-container')">
+            <label style="margin: 0; font-weight: 600;">Enable IClass Biz Manager Sync</label>
+          </div>
+          <div id="setting-iclass-container" style="display: none; border-top: 1px dashed var(--border-color); padding-top: 0.5rem; margin-top: 0.5rem;">
+            <div class="form-group">
+              <label>Database Server Host</label>
+              <input type="text" id="setting-iclass-host" class="form-control" placeholder="e.g. SERVER">
+            </div>
+            <div class="form-group">
+              <label>Database Name</label>
+              <input type="text" id="setting-iclass-db" class="form-control" placeholder="e.g. ValueMartDB">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+              <div class="form-group">
+                <label>DB Username</label>
+                <input type="text" id="setting-iclass-user" class="form-control" placeholder="sa">
+              </div>
+              <div class="form-group">
+                <label>DB Password</label>
+                <input type="password" id="setting-iclass-pass" class="form-control" placeholder="iclassadmin">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Active User Session</label>
+              <input type="text" id="setting-iclass-username" class="form-control" readonly placeholder="AMCE.BERNIE">
+            </div>
+          </div>
+          <button class="btn btn-gold" style="width: 100%; margin-top: 0.5rem;" onclick="saveSettings()">
+            Save Configuration
+          </button>
+        </div>
+
+        <!-- Sign Out Action -->
+        <button class="btn btn-crimson" style="width: 100%; justify-content: center;" onclick="logoutOrganization()">
+          Sign Out of Organization
+        </button>
+      </div>
+
+    </div>
+
+    <!-- F. BOTTOM NAVIGATION BAR -->
+    <div class="bottom-nav">
+      <button class="nav-tab active" onclick="switchTab('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <rect x="3" y="3" width="7" height="9" rx="1"></rect>
+          <rect x="14" y="3" width="7" height="5" rx="1"></rect>
+          <rect x="14" y="12" width="7" height="9" rx="1"></rect>
+          <rect x="3" y="16" width="7" height="5" rx="1"></rect>
+        </svg>
+        <span>Overview</span>
+      </button>
+
+      <button class="nav-tab" onclick="switchTab('catalog')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+        </svg>
+        <span>My Stock</span>
+      </button>
+
+      <button class="nav-tab" onclick="switchTab('scanner')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+          <circle cx="12" cy="13" r="4"></circle>
+        </svg>
+        <span>Scanner</span>
+      </button>
+
+      <button class="nav-tab" onclick="switchTab('requests')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+        <span>Requests</span>
+      </button>
+
+      <button class="nav-tab" onclick="switchTab('more')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="12" cy="12" r="1"></circle>
+          <circle cx="12" cy="5" r="1"></circle>
+          <circle cx="12" cy="19" r="1"></circle>
+        </svg>
+        <span>Options</span>
+      </button>
+    </div>
+
+    <!-- G. UNIVERSAL PRODUCT PICKER MODAL -->
+    <div id="product-picker-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content product-picker-content">
+        <div class="modal-header">
+          <h3 style="color: var(--color-purple-primary); margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="9" rx="1"></rect>
+              <rect x="14" y="3" width="7" height="5" rx="1"></rect>
+              <rect x="14" y="12" width="7" height="9" rx="1"></rect>
+              <rect x="3" y="16" width="7" height="5" rx="1"></rect>
+            </svg>
+            Select Product
+          </h3>
+          <button class="modal-close-btn" onclick="closeProductPicker()">&times;</button>
+        </div>
+        
+        <!-- Picker Options: Tabs -->
+        <div class="picker-tabs">
+          <button class="picker-tab active" id="btn-picker-tab-search" onclick="switchPickerTab('search')">Search</button>
+          <button class="picker-tab" id="btn-picker-tab-scan" onclick="switchPickerTab('scan')">Scan</button>
+          <button class="picker-tab" id="btn-picker-tab-recent" onclick="switchPickerTab('recent')">Recents</button>
+          <button class="picker-tab" id="btn-picker-tab-fav" onclick="switchPickerTab('fav')">Favorites</button>
+        </div>
+
+        <!-- Search Tab Content -->
+        <div class="picker-tab-content active" id="picker-content-search">
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+            <input type="text" id="picker-search-input" class="form-control" placeholder="Search by SKU, code, name..." oninput="handlePickerSearch()">
+            <button class="btn btn-gold" style="padding: 0.5rem; display: flex; align-items: center; justify-content: center;" onclick="startPickerVoiceSearch()">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="picker-results-container" id="picker-search-results">
+            <!-- Live search list populated here -->
+          </div>
+        </div>
+
+        <!-- Scan Barcode Tab Content -->
+        <div class="picker-tab-content" id="picker-content-scan">
+          <div class="scanner-viewport mini-viewport" style="position: relative; height: 180px; margin-bottom: 0.75rem; background: #000; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; overflow: hidden;">
+            <video id="picker-camera-video" autoplay playsinline muted style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+            <canvas id="picker-barcode-canvas" style="display: none;"></canvas>
+            <div class="scan-laser" id="picker-scanner-laser" style="display: none; position: absolute; left: 0; width: 100%; height: 2px; background: var(--color-gold); animation: scannerScanLaser 1.5s infinite linear; z-index: 2;"></div>
+            <div style="color: var(--text-dim); font-size: 0.75rem; font-weight: 600; z-index: 1;" id="picker-camera-status">
+              Camera: Locked
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label style="font-size: 0.75rem;">Scan or Enter Barcode/SKU</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="text" id="picker-barcode-input" class="form-control" placeholder="e.g. TS-100">
+              <button class="btn btn-gold" onclick="handlePickerBarcodeSubmit()">Intake</button>
+            </div>
+          </div>
+          <!-- Fallback Creation Dialog (hidden by default) -->
+          <div id="picker-fallback-creation" style="display: none; border: 1px solid var(--color-gold); background: rgba(197, 160, 89, 0.05); padding: 0.75rem; border-radius: var(--radius); margin-top: 0.5rem;">
+            <div style="font-size: 0.75rem; font-weight: 700; color: var(--color-purple-primary); margin-bottom: 0.5rem;">
+              Product not found. Register this item?
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr; gap: 0.4rem; font-size: 0.7rem;">
+              <input type="text" id="picker-new-name" class="form-control" placeholder="Product Name" style="padding: 0.35rem 0.5rem; font-size: 0.7rem; height: auto;">
+              <div style="display: flex; gap: 0.4rem;">
+                <select id="picker-new-category" class="form-control" style="padding: 0.35rem; font-size: 0.7rem; height: auto; flex: 1;"></select>
+                <input type="number" id="picker-new-price" class="form-control" placeholder="Price ($)" style="padding: 0.35rem 0.5rem; font-size: 0.7rem; height: auto; width: 80px;">
+              </div>
+              <button class="btn btn-gold" style="width: 100%; padding: 0.4rem; font-size: 0.75rem; margin-top: 0.25rem;" onclick="handlePickerNewProductSubmit()">Register & Select</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recents Tab Content -->
+        <div class="picker-tab-content" id="picker-content-recent">
+          <div class="picker-results-container" id="picker-recent-results">
+            <!-- Populated from localStorage -->
+          </div>
+        </div>
+
+        <!-- Favorites Tab Content -->
+        <div class="picker-tab-content" id="picker-content-fav">
+          <div class="picker-results-container" id="picker-fav-results">
+            <!-- Populated from localStorage favorites -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- H. FLOATING AI VOICE ASSISTANT -->
+    <div id="ai-voice-assistant-container">
+      <div id="ai-speech-bubble" style="display: none;">
+        <div class="speech-loading-dots" id="speech-loading" style="display: none;">
+          <span></span><span></span><span></span>
+        </div>
+        <span id="ai-speech-text">Listening...</span>
+      </div>
+      <button id="btn-voice-assistant" class="floating-voice-btn" onclick="toggleVoiceAssistantListening()">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" y1="19" x2="12" y2="23"></line>
+          <line x1="8" y1="23" x2="16" y2="23"></line>
+        </svg>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Notification Toast Area -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Client Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
