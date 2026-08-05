@@ -1,5 +1,54 @@
 // SmartStock Mobile Client Application Logic
 
+// ----------------------------------------------------
+// GLOBAL JS ERROR BOUNDARY
+// Catch unhandled exceptions to prevent WebView crashes
+// ----------------------------------------------------
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+  console.error("Global JS Error Caught:", msg, "at", url, ":", lineNo, error);
+  return true; // Prevents error banner / crash
+};
+
+window.addEventListener('unhandledrejection', function(event) {
+  console.error("Unhandled Promise Rejection:", event.reason);
+});
+
+// ----------------------------------------------------
+// NETWORK & OFFLINE DETECTION
+// ----------------------------------------------------
+function checkNetworkConnection() {
+  if (navigator.onLine === false) {
+    const offlineScreen = document.getElementById('offline-screen');
+    if (offlineScreen) offlineScreen.style.display = 'flex';
+    return false;
+  }
+  const offlineScreen = document.getElementById('offline-screen');
+  if (offlineScreen) offlineScreen.style.display = 'none';
+  return true;
+}
+
+function checkNetworkAndRetry() {
+  if (navigator.onLine) {
+    const offlineScreen = document.getElementById('offline-screen');
+    if (offlineScreen) offlineScreen.style.display = 'none';
+    if (typeof showToast === 'function') showToast("Internet connection restored.");
+    checkAuthSession();
+  } else {
+    if (typeof showToast === 'function') showToast("Still offline. Please check connection.");
+  }
+}
+
+window.addEventListener('online', () => {
+  const offlineScreen = document.getElementById('offline-screen');
+  if (offlineScreen) offlineScreen.style.display = 'none';
+  if (typeof showToast === 'function') showToast("Back online!");
+});
+
+window.addEventListener('offline', () => {
+  const offlineScreen = document.getElementById('offline-screen');
+  if (offlineScreen) offlineScreen.style.display = 'flex';
+});
+
 const API_BASE = 'https://smart-stock-seven.vercel.app';
 let isOfflineMode = false;
 let currentUser = null; // { user_id, name, email, role, org_id }
@@ -18,6 +67,7 @@ let cameraPermissionGranted = false;
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
+  checkNetworkConnection();
   initOnboardingFlow();
   initVoiceAndPicker();
   // Invoice search form submission handler
@@ -58,16 +108,20 @@ function initOnboardingFlow() {
   if (onboarded === 'true') {
     splash.style.display = 'none';
     walkthrough.style.display = 'none';
-    checkAuthSession();
+    if (checkNetworkConnection()) {
+      checkAuthSession();
+    }
   } else {
     splash.style.display = 'flex';
     setTimeout(() => {
       splash.style.opacity = '0';
       setTimeout(() => {
         splash.style.display = 'none';
-        walkthrough.style.display = 'flex';
+        if (checkNetworkConnection()) {
+          walkthrough.style.display = 'flex';
+        }
       }, 300);
-    }, 2000);
+    }, 3000); // 3 second splash/loading screen for WebView
   }
 }
 

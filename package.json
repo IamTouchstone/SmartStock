@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "server": "node server.js"
+    "server": "node server.js",
+    "build": "node -e \"const fs=require('fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.cpSync('public','dist',{recursive:true}); console.log('Built web assets to dist/');\""
   },
   "dependencies": {
     "@capacitor/android": "^7.0.0",
@@ -19,7 +20,8 @@
     "pdfkit": "^0.15.0"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.0.0"
+    "@capacitor/cli": "^7.0.0",
+    "typescript": "^5.3.3"
   },
   "engines": {
     "node": ">=18.0.0"

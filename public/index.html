@@ -35,6 +35,18 @@
       </div>
     </div>
 
+    <!-- OFFLINE WARNING OVERLAY -->
+    <div id="offline-screen" style="position: absolute; top:0; left:0; width:100%; height:100%; background: #13091B; color: #fff; z-index: 999; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; text-align: center;">
+      <div style="font-size: 3rem; margin-bottom: 1rem;">📡</div>
+      <h2 style="color: var(--color-gold); font-size: 1.35rem; margin-bottom: 0.5rem; font-weight: 700;">No Internet Connection</h2>
+      <p style="color: #bbb; font-size: 0.85rem; max-width: 280px; margin-bottom: 1.5rem; line-height: 1.5;">
+        SmartStock requires an active internet connection to load remote Vercel services. Please check your network and try again.
+      </p>
+      <button class="btn btn-gold" onclick="checkNetworkAndRetry()" style="padding: 0.6rem 1.5rem; font-size: 0.85rem;">
+        🔄 Retry Connection
+      </button>
+    </div>
+
     <!-- B. CAROUSEL WALKTHROUGH SCREEN -->
     <div class="overlay-screen" id="walkthrough-screen">
       <!-- Slide 1: AI Velocity -->
