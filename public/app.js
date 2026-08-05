@@ -1,8 +1,6 @@
 // SmartStock Mobile Client Application Logic
 
-const API_BASE = (window.location.origin && !window.location.origin.startsWith('http://localhost') && !window.location.origin.startsWith('http://127.0.0.1') && !window.location.origin.includes('vercel.app'))
-  ? 'https://smart-stock-seven.vercel.app'
-  : ''; 
+const API_BASE = 'https://smart-stock-seven.vercel.app';
 let isOfflineMode = false;
 let currentUser = null; // { user_id, name, email, role, org_id }
 let currentOrg = null;  // { id, org_name, admin_email, industry }
@@ -48,32 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
-
-  // Invoice search form submission handler
-  const searchForm = document.getElementById('invoice-search-form');
-  if (searchForm) {
-    searchForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const params = new URLSearchParams();
-      const cust = document.getElementById('search-customer').value.trim();
-      if (cust) params.append('customer_name', cust);
-      const receipt = document.getElementById('search-receipt').value.trim();
-      if (receipt) params.append('receipt_number', receipt);
-      const invoice = document.getElementById('search-invoice').value.trim();
-      if (invoice) params.append('invoice_number', invoice);
-      const product = document.getElementById('search-product').value.trim();
-      if (product) params.append('product_name', product);
-      const date = document.getElementById('search-date').value;
-      if (date) params.append('date', date);
-      const start = document.getElementById('search-start-date').value;
-      const end = document.getElementById('search-end-date').value;
-      if (start && end) { params.append('start_date', start); params.append('end_date', end); }
-      const status = document.getElementById('search-status').value;
-      if (status) params.append('payment_status', status);
-      const res = await authFetch(`/api/invoices/search?${params.toString()}`);
-      if (res.ok) { const data = await res.json(); loadInvoiceLedger(data); } else { showToast('Search failed'); }
-    });
-  }
 
 // ----------------------------------------------------
 // ONBOARDING SPLASH & WALKTHROUGH FLOW
@@ -143,7 +115,7 @@ async function checkAuthSession() {
 
   try {
     const res = await authFetch('/api/auth/me');
-    if (res.ok) {
+    if (res && res.ok) {
       const data = await res.json();
       currentUser = {
         user_id: data.user_id,
@@ -205,17 +177,23 @@ async function handleLoginSubmit(e) {
   const password = document.getElementById('login-password').value.trim();
 
   try {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ admin_email, password })
     });
 
-    const data = await res.json();
     if (!res.ok) {
-      showToast(`Login failed: ${data.error}`);
+      let errMsg = "Server error. Please try again.";
+      try {
+        const errData = await res.json();
+        if (errData && errData.error) errMsg = `Login failed: ${errData.error}`;
+      } catch (_) {}
+      showToast(errMsg);
       return;
     }
+
+    const data = await res.json();
 
     localStorage.setItem('smartstock_token', data.token);
     localStorage.setItem('smartstock_user_id', data.user_id);
@@ -230,7 +208,7 @@ async function handleLoginSubmit(e) {
     loadAllViews();
 
   } catch (err) {
-    showToast(`Login error: ${err.message}`);
+    showToast("Server error. Please try again.");
   }
 }
 
@@ -242,17 +220,23 @@ async function handleSignupSubmit(e) {
   const industry = document.getElementById('signup-industry').value;
 
   try {
-    const res = await fetch('/api/auth/signup', {
+    const res = await fetch(`${API_BASE}/api/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ org_name, admin_email, password, industry })
     });
 
-    const data = await res.json();
     if (!res.ok) {
-      showToast(`Registration failed: ${data.error}`);
+      let errMsg = "Server error. Please try again.";
+      try {
+        const errData = await res.json();
+        if (errData && errData.error) errMsg = `Registration failed: ${errData.error}`;
+      } catch (_) {}
+      showToast(errMsg);
       return;
     }
+
+    const data = await res.json();
 
     localStorage.setItem('smartstock_token', data.token);
     localStorage.setItem('smartstock_user_id', data.user_id);
@@ -267,7 +251,7 @@ async function handleSignupSubmit(e) {
     loadAllViews();
 
   } catch (err) {
-    showToast(`Registration error: ${err.message}`);
+    showToast("Server error. Please try again.");
   }
 }
 
@@ -632,7 +616,7 @@ async function startIntakeBarcodeScanner() {
     console.warn("Html5Qrcode start exception:", err);
     if (status) {
       status.style.display = 'block';
-      status.innerText = `Camera: ${currentCameraFacingMode === 'user' ? 'Front' : 'Back'} Camera Ready`;
+      status.innerText = "Camera not available. Please type SKU manually.";
     }
   }
 }
@@ -640,13 +624,42 @@ async function startIntakeBarcodeScanner() {
 function onIntakeBarcodeScanned(skuValue) {
   if (!skuValue) return;
 
+  skuValue = skuValue.trim().toUpperCase();
+
   const skuInput = document.getElementById('scanner-barcode-input');
   if (skuInput) {
-    skuInput.value = skuValue.trim().toUpperCase();
+    skuInput.value = skuValue;
   }
 
   showToast(`✅ Barcode Scanned: ${skuValue}`);
   
+  // Display product details if matched in rawCatalog
+  const infoDiv = document.getElementById('scanner-product-info');
+  if (infoDiv) {
+    const product = (rawCatalog || []).find(p => p.sku && p.sku.toUpperCase() === skuValue);
+    if (product) {
+      infoDiv.innerHTML = `
+        <div style="font-weight:700; color:var(--color-purple-primary); margin-bottom:0.25rem;">
+          📦 Product Found: ${product.name}
+        </div>
+        <div style="color:var(--text-muted); line-height: 1.4;">
+          Category: <strong>${product.category || 'General'}</strong> | Price: <strong>$${product.price || 0}</strong><br>
+          Current Stock: <strong>${product.total_stock || 0} units</strong>
+        </div>
+      `;
+    } else {
+      infoDiv.innerHTML = `
+        <div style="font-weight:700; color:var(--state-amber); margin-bottom:0.25rem;">
+          🔍 New SKU Detected: ${skuValue}
+        </div>
+        <div style="color:var(--text-muted);">
+          Item not in catalog yet. Click <strong>Add/Register Item</strong> to register it in inventory.
+        </div>
+      `;
+    }
+    infoDiv.style.display = 'block';
+  }
+
   // Stop scanning after successful scan as required
   stopIntakeBarcodeScanner();
 }

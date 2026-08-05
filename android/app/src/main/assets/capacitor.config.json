@@ -4,9 +4,13 @@
 	"webDir": "public",
 	"server": {
 		"url": "https://smart-stock-seven.vercel.app",
+		"cleartext": true,
 		"androidScheme": "https",
 		"allowNavigation": [
 			"smart-stock-seven.vercel.app"
 		]
+	},
+	"android": {
+		"webContentsDebuggingEnabled": true
 	}
 }
