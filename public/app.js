@@ -225,6 +225,26 @@ function switchAuthTab(tab) {
   }
 }
 
+async function handleResponseJson(res, defaultErrorMsg = 'Server error. Please try again.') {
+  if (!res) throw new Error('No response received from server.');
+  if (!res.ok) {
+    let errMsg = defaultErrorMsg;
+    try {
+      const errData = await res.json();
+      if (errData && errData.error) {
+        errMsg = errData.error;
+      }
+    } catch (_) {}
+    throw new Error(errMsg);
+  }
+  try {
+    return await res.json();
+  } catch (err) {
+    console.error("Failed to parse JSON response:", err);
+    throw new Error("Invalid response format received from server.");
+  }
+}
+
 async function handleLoginSubmit(e) {
   e.preventDefault();
   const admin_email = document.getElementById('login-email').value.trim();
@@ -237,17 +257,7 @@ async function handleLoginSubmit(e) {
       body: JSON.stringify({ admin_email, password })
     });
 
-    if (!res.ok) {
-      let errMsg = "Server error. Please try again.";
-      try {
-        const errData = await res.json();
-        if (errData && errData.error) errMsg = `Login failed: ${errData.error}`;
-      } catch (_) {}
-      showToast(errMsg);
-      return;
-    }
-
-    const data = await res.json();
+    const data = await handleResponseJson(res, "Login failed. Please check credentials.");
 
     localStorage.setItem('smartstock_token', data.token);
     localStorage.setItem('smartstock_user_id', data.user_id);
@@ -262,7 +272,7 @@ async function handleLoginSubmit(e) {
     loadAllViews();
 
   } catch (err) {
-    showToast("Server error. Please try again.");
+    showToast(err.message || "Server error. Please try again.");
   }
 }
 
@@ -280,17 +290,7 @@ async function handleSignupSubmit(e) {
       body: JSON.stringify({ org_name, admin_email, password, industry })
     });
 
-    if (!res.ok) {
-      let errMsg = "Server error. Please try again.";
-      try {
-        const errData = await res.json();
-        if (errData && errData.error) errMsg = `Registration failed: ${errData.error}`;
-      } catch (_) {}
-      showToast(errMsg);
-      return;
-    }
-
-    const data = await res.json();
+    const data = await handleResponseJson(res, "Registration failed. Please try again.");
 
     localStorage.setItem('smartstock_token', data.token);
     localStorage.setItem('smartstock_user_id', data.user_id);
@@ -305,7 +305,7 @@ async function handleSignupSubmit(e) {
     loadAllViews();
 
   } catch (err) {
-    showToast("Server error. Please try again.");
+    showToast(err.message || "Server error. Please try again.");
   }
 }
 
@@ -328,7 +328,8 @@ async function authFetch(endpoint, options = {}) {
   options.headers['X-Org-Id'] = token;
   options.headers['X-User-Id'] = user_id;
 
-  const res = await fetch(`${API_BASE}${endpoint}`, options);
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  const res = await fetch(url, options);
   return res;
 }
 
@@ -537,11 +538,7 @@ async function submitNewProductManual(e) {
       })
     });
 
-    const data = await res.json();
-    if (!res.ok) {
-      showToast(`Registration Error: ${data.error}`);
-      return;
-    }
+    const data = await handleResponseJson(res, "Item registration failed.");
 
     showToast(`Product ${sku} registered successfully!`);
     e.target.reset();
@@ -901,11 +898,7 @@ async function submitNewCustomerRequest(e) {
       body: JSON.stringify({ customer_name, customer_email, requested_item, item_description, quantity, notes, category, priority })
     });
 
-    const data = await res.json();
-    if (!res.ok) {
-      showToast(`Request Upload Failed: ${data.error}`);
-      return;
-    }
+    const data = await handleResponseJson(res, "Request upload failed.");
 
     showToast("Customer request uploaded successfully");
     e.target.reset();
@@ -919,7 +912,11 @@ async function submitNewCustomerRequest(e) {
 async function loadCustomerRequests() {
   try {
     const res = await authFetch('/api/customer-requests');
-    rawRequests = await res.json();
+    if (res && res.ok) {
+      rawRequests = await res.json();
+    } else {
+      rawRequests = [];
+    }
 
     // Toggle request form card: Staff gets creation form
     const requestCard = document.getElementById('manual-request-card');
