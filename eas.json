@@ -1,5 +1,6 @@
 {
   "cli": {
+<<<<<<< HEAD
     "version": ">= 15.0.0"
   },
   "build": {
@@ -15,3 +16,30 @@
     "production": {}
   }
 }
+=======
+    "version": ">= 5.9.0"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
+>>>>>>> 996fba9 (v1.0.1 Fix invoice forEach syntax - backend ready for production)

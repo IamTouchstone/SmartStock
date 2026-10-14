@@ -2,27 +2,80 @@
   "expo": {
     "name": "SmartStock",
     "slug": "smartstock",
+<<<<<<< HEAD
     "version": "1.0.0",
+=======
+    "version": "1.0.1",
+>>>>>>> 996fba9 (v1.0.1 Fix invoice forEach syntax - backend ready for production)
     "orientation": "portrait",
     "icon": "./public/icons/icon-512.png",
     "scheme": "smartstock",
     "userInterfaceStyle": "automatic",
+<<<<<<< HEAD
     "newArchEnabled": true,
+=======
+    "splash": {
+      "image": "./public/icons/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#090D16"
+    },
+>>>>>>> 996fba9 (v1.0.1 Fix invoice forEach syntax - backend ready for production)
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
+<<<<<<< HEAD
         "backgroundColor": "#ffffff",
         "foregroundImage": "./public/icons/icon-512.png"
       },
       "package": "com.smartstock.app"
+=======
+        "foregroundImage": "./public/icons/adaptive-icon.png",
+        "backgroundColor": "#090D16"
+      },
+      "package": "com.smartstock.app",
+      "versionCode": 2,
+      "permissions": [
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+>>>>>>> 996fba9 (v1.0.1 Fix invoice forEach syntax - backend ready for production)
     },
     "web": {
       "bundler": "metro"
     },
     "plugins": [
+<<<<<<< HEAD
       "expo-router"
     ]
   }
 }
+=======
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "backendUrl": "https://smart-stock-master.vercel.app",
+      "router": {},
+      "eas": {
+        "projectId": "9eec5173-cd3d-40f7-8d72-c5b7d988b649"
+      }
+    }
+  }
+}
+>>>>>>> 996fba9 (v1.0.1 Fix invoice forEach syntax - backend ready for production)
